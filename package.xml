@@ -1,0 +1,35 @@
+<?xml version="1.0"?>
+<package format="2">
+  <name>control</name>
+  <version>0.0.0</version>
+  <description>The control package</description>
+
+  <maintainer email="thies.lennart.alff@tuhh.de">Thies Lennart Alff</maintainer>
+
+
+  <!-- One license tag required, multiple allowed, one license per tag -->
+  <!-- Commonly used license strings: -->
+  <!--   BSD, MIT, Boost Software License, GPLv2, GPLv3, LGPLv2.1, LGPLv3 -->
+  <license>TODO</license>
+
+
+<url type="website">hippocampusrobotics.github.io/docs</url>
+
+
+  <author email="thies.lennart.alff@tuhh.de">Thies Lennart Alff</author>
+
+  <buildtool_depend>catkin</buildtool_depend>
+  <build_depend>hippocampus_common</build_depend>
+  <build_depend>hippocampus_msgs</build_depend>
+  <build_export_depend>hippocampus_common</build_export_depend>
+  <build_export_depend>hippocampus_msgs</build_export_depend>
+  <exec_depend>hippocampus_common</exec_depend>
+  <exec_depend>hippocampus_msgs</exec_depend>
+
+
+  <!-- The export tag contains other, unspecified, tags -->
+  <export>
+    <!-- Other tools can request additional information be placed here -->
+
+  </export>
+</package>
