@@ -1,3 +1,108 @@
+import threading
+
+import rospy
+from dynamic_reconfigure.server import Server
+from hippocampus_common.node import Node
+
+from control.cfg import PidControlConfig
+
+
+class PidNode(Node):
+    """A template class for PID controller nodes.
+
+    """    
+    def __init__(self, name):
+        """
+
+        Args:
+            name (str): The node's name.
+        """        
+        super(PidNode, self).__init__(name=name)
+
+        #: lock to provide thread safety for non local variables
+        self.data_lock = threading.RLock()
+
+        #: The controller's setpoint. In most cases you want to update the value
+        #: in a message callback function.
+        self.setpoint = 0.0
+        
+        self._controller = Controller()
+        self._t_last = rospy.get_time()
+
+        self._dyn_reconf_pid = Server(PidControlConfig,
+                                      self._on_pid_reconfigure)
+
+    def _on_pid_reconfigure(self, config, level):
+        """Callback for the dynamic reconfigure service to set PID control
+        specific parameters.
+
+        Args:
+            config (dict): Holds parameters and values of the dynamic
+                reconfigure config file.
+            level (int): Level of the changed parameters
+
+        Returns:
+            dict: The actual parameters that are currently applied.
+        """
+        with self.data_lock:
+            self._controller.p_gain = config["p"]
+            self._controller.i_gain = config["i"]
+            self._controller.d_gain = config["d"]
+            self._controller.saturation = [
+                config["saturation_lower"], config["saturation_upper"]
+            ]
+            config["p"] = self._controller.p_gain
+            config["i"] = self._controller.i_gain
+            config["d"] = self._controller.d_gain
+            lower, upper = self._controller.saturation
+            config["saturation_lower"] = lower
+            config["saturation_upper"] = upper
+        return config
+
+    def _update_dt(self, now):
+        """Updates the time difference between controller updates.
+
+        Args:
+            now (float): Current UTC stamp in seconds.
+
+        Returns:
+            float: Time difference between current and last controller update.
+        """
+        dt = now - self._t_last
+        dt_max = 0.1
+        dt_min = 0.01
+        if dt > dt_max:
+            rospy.logwarn(
+                "[%s] Timespan since last update too large (%fs)."
+                "Limited to %fs", rospy.get_name(), dt, dt_max)
+            dt = dt_max
+        elif dt < dt_min:
+            rospy.logwarn(
+                "[%s] Timespan since last update too small (%fs)."
+                "Limited to %fs", rospy.get_name(), dt, dt_min)
+            dt = dt_min
+
+        self._t_last = now
+        return dt
+
+    def update_controller(self, error, now, derror=None):
+        """Computes the updated PID controller's output.
+
+        Args:
+            error (float): Control error.
+            now (float): Current UTC timestamp in seconds.
+            derror (float, optional): If set the value is used as derivate of
+                the control error. Otherwise a difference quotient is computed.
+                Defaults to None.
+
+        Returns:
+            float: Control output.
+        """
+        dt = self._update_dt(now)
+        u = self._controller.update(error=error, dt=dt, derror=derror)
+        return u
+
+
 class Controller():
     # TODO: Implement an antiwindup for the integral. The integral should be
     # frozen if the output control output is saturated and control error and
