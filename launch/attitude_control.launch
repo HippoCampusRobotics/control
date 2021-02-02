@@ -1,0 +1,5 @@
+<launch>
+    <arg name="use_ground_truth" />
+    <include file="$(find control)/launch/attitude_mixer_node.launch" pass_all_args="true" />
+    <include file="$(find control)/launch/depth_control_node.launch" pass_all_args="true" />
+</launch>
