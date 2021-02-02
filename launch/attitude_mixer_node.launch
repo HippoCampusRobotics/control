@@ -1,0 +1,3 @@
+<launch>
+    <node name="attitude_mixer" pkg="control" type="attitude_mixer_node" />
+</launch>

@@ -1,0 +1,85 @@
+#!/usr/bin/env python
+
+import threading
+
+import rospy
+import tf.transformations
+from hippocampus_common.node import Node
+from mavros_msgs.msg import AttitudeTarget
+from std_msgs.msg import Float64
+
+
+class AttitudeMixerNode(Node):
+    def __init__(self, name):
+        super(AttitudeMixerNode, self).__init__(name=name)
+        self.data_lock = threading.RLock()
+        self.pitch_angle = 0.0
+        self.yaw_angle = 0.0
+        self.roll_angle = 0.0
+        self.thrust = 0.3
+
+        self.attitude_pub = rospy.Publisher("mavros/setpoint_raw/attitude",
+                                            AttitudeTarget,
+                                            queue_size=1)
+
+        self.roll_angle_sub = rospy.Subscriber("roll_angle",
+                                               Float64,
+                                               self.on_roll_angle,
+                                               queue_size=1)
+        self.pitch_angle_sub = rospy.Subscriber("pitch_angle",
+                                                Float64,
+                                                self.on_pitch_angle,
+                                                queue_size=1)
+        self.yaw_angle_sub = rospy.Subscriber("yaw_angle",
+                                              Float64,
+                                              self.on_yaw_angle,
+                                              queue_size=1)
+        self.thrust_sub = rospy.Subscriber("thrust",
+                                           Float64,
+                                           self.on_thrust,
+                                           queue_size=1)
+
+    def on_pitch_angle(self, msg):
+        with self.data_lock:
+            self.pitch_angle = msg.data
+
+    def on_roll_angle(self, msg):
+        with self.data_lock:
+            self.roll_angle = msg.data
+
+    def on_yaw_angle(self, msg):
+        with self.data_lock:
+            self.yaw_angle = msg.data
+
+    def on_thrust(self, msg):
+        with self.data_lock:
+            self.thrust = msg.data
+
+    def run(self):
+        rate = rospy.Rate(50.0)
+        while not rospy.is_shutdown():
+            self.publish_attitude_target()
+            rate.sleep()
+
+    def publish_attitude_target(self):
+        msg = AttitudeTarget()
+        msg.type_mask = (msg.IGNORE_PITCH_RATE | msg.IGNORE_ROLL_RATE
+                         | msg.IGNORE_YAW_RATE)
+        with self.data_lock:
+            q = tf.transformations.quaternion_from_euler(
+                self.roll_angle, self.pitch_angle, self.yaw_angle)
+            msg.orientation.x = q[0]
+            msg.orientation.y = q[1]
+            msg.orientation.z = q[2]
+            msg.orientation.w = q[3]
+            msg.thrust = self.thrust
+        self.attitude_pub.publish(msg)
+
+
+def main():
+    node = AttitudeMixerNode("attitude_mixer")
+    node.run()
+
+
+if __name__ == "__main__":
+    main()

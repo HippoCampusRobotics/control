@@ -3,20 +3,20 @@ import threading
 import rospy
 from dynamic_reconfigure.server import Server
 from hippocampus_common.node import Node
+from std_msgs.msg import Float64
 
 from control.cfg import PidControlConfig
 
 
 class PidNode(Node):
     """A template class for PID controller nodes.
-
-    """    
+    """
     def __init__(self, name):
         """
 
         Args:
             name (str): The node's name.
-        """        
+        """
         super(PidNode, self).__init__(name=name)
 
         #: lock to provide thread safety for non local variables
@@ -25,12 +25,19 @@ class PidNode(Node):
         #: The controller's setpoint. In most cases you want to update the value
         #: in a message callback function.
         self.setpoint = 0.0
-        
+
         self._controller = Controller()
         self._t_last = rospy.get_time()
 
         self._dyn_reconf_pid = Server(PidControlConfig,
                                       self._on_pid_reconfigure)
+
+        self.setpoint_sub = rospy.Subscriber("~setpoint", Float64,
+                                             self._on_setpoint)
+
+    def _on_setpoint(self, msg):
+        with self.data_lock:
+            self.setpoint = msg.data
 
     def _on_pid_reconfigure(self, config, level):
         """Callback for the dynamic reconfigure service to set PID control
@@ -51,12 +58,18 @@ class PidNode(Node):
             self._controller.saturation = [
                 config["saturation_lower"], config["saturation_upper"]
             ]
+            self._controller.integral_limits = [
+                config["integral_limit_lower"], config["integral_limit_upper"]
+            ]
             config["p"] = self._controller.p_gain
             config["i"] = self._controller.i_gain
             config["d"] = self._controller.d_gain
             lower, upper = self._controller.saturation
             config["saturation_lower"] = lower
             config["saturation_upper"] = upper
+            lower, upper = self._controller.integral_limits
+            config["integral_limit_lower"] = lower
+            config["integral_limit_upper"] = upper
         return config
 
     def _update_dt(self, now):
@@ -104,16 +117,28 @@ class PidNode(Node):
 
 
 class Controller():
-    # TODO: Implement an antiwindup for the integral. The integral should be
-    # frozen if the output control output is saturated and control error and
-    # integral have the same sign.
-    #
+    """A quite normal PID controller.
+
+    PID gains can either be set on the creation of a controller instance or
+    via the respective properties any time later on. Compute the control output
+    by invoking ``update``.
+
+    Examples:
+        ::
+            controller = Controller(p_gain=3.4, i_gain=1.1, d_gain=0.1)
+            controller.p_gain = 1.0
+            print("Controller's p_gain: {}".format(controller.p_gain))
+
+            control_error = 1.0
+            control_output = controller.update(error=control_error, dt=0.02)
+            print("Control output: {}".format(control_output))
+    """
     def __init__(self, p_gain=1.0, i_gain=0.0, d_gain=0.0):
         self.p_gain = p_gain
         self.i_gain = i_gain
         self.d_gain = d_gain
         self.saturation = [-100, 100]
-        self.integral_limits = [-100, 100]
+        self.integral_limits = [-1, 1]
         self._integral = 0.0
         self._derivative = 0.0
         self._last_error = 0.0
@@ -140,7 +165,7 @@ class Controller():
         return u
 
     def _update_integral(self, error, dt):
-        delta_integral = dt * error * self.i_gain
+        delta_integral = dt * error
         self._integral = max(
             self.integral_limits[0],
             min(self.integral_limits[1], self._integral + delta_integral))
