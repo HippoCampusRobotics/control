@@ -63,6 +63,7 @@ class AttitudeMixerNode(Node):
 
     def publish_attitude_target(self):
         msg = AttitudeTarget()
+        msg.header.stamp = rospy.Time.now()
         msg.type_mask = (msg.IGNORE_PITCH_RATE | msg.IGNORE_ROLL_RATE
                          | msg.IGNORE_YAW_RATE)
         with self.data_lock:
