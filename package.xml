@@ -27,6 +27,7 @@
   <exec_depend>hippocampus_common</exec_depend>
   <exec_depend>hippocampus_msgs</exec_depend>
   <exec_depend>mavros_msgs</exec_depend>
+  <depend>path_planning</depend>
 
 
   <!-- The export tag contains other, unspecified, tags -->
