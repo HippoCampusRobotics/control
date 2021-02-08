@@ -1,13 +1,15 @@
-import rospy
-import numpy
-from hippocampus_common.node import Node
-from path_planning.path_planning import Path
-from geometry_msgs.msg import PoseStamped, PointStamped
-from std_msgs.msg import Float64
-from nav_msgs.msg import Odometry
-from dynamic_reconfigure.server import Server
-from control.cfg import CarrotControlConfig
 import threading
+
+import numpy
+import rospy
+from dynamic_reconfigure.server import Server
+from geometry_msgs.msg import PointStamped, PoseStamped
+from hippocampus_common.node import Node
+from nav_msgs.msg import Odometry
+from path_planning.path_planning import Path
+from std_msgs.msg import Float64
+
+from control.cfg import CarrotControlConfig
 
 
 class PathFollowerNode(Node):
