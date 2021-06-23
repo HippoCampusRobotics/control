@@ -1,6 +1,6 @@
 <launch>
     <arg name="use_ground_truth" />
-    <arg name="param_file" default="$(find control)/config/depth_control_simulation_default.yaml" />
+    <arg name="param_file" default="$(find control)/config/depth_control_default.yaml" />
     <node name="depth_control" pkg="control" type="depth_control_node">
         <param name="use_ground_truth" value="$(arg use_ground_truth)" />
         <rosparam file="$(arg param_file)" />
