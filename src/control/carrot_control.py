@@ -3,7 +3,8 @@ import threading
 import numpy
 import rospy
 from dynamic_reconfigure.server import Server
-from geometry_msgs.msg import PointStamped, PoseStamped
+from hippocampus_msgs.msg import PathFollowerTarget
+from geometry_msgs.msg import PoseStamped
 from hippocampus_common.node import Node
 from nav_msgs.msg import Odometry
 from path_planning.path_planning import Path
@@ -23,12 +24,9 @@ class PathFollowerNode(Node):
         self.path.update_path_from_param_server()
 
         self.yaw_pub = rospy.Publisher("yaw_angle", Float64, queue_size=1)
-        self.target_pub = rospy.Publisher("~target_position",
-                                          PointStamped,
+        self.target_pub = rospy.Publisher("~target",
+                                          PathFollowerTarget,
                                           queue_size=30)
-        self.current_pub = rospy.Publisher("~current_position",
-                                           PointStamped,
-                                           queue_size=30)
 
         self.use_ground_truth = self.get_param("~use_ground_truth",
                                                default=False)
@@ -75,12 +73,12 @@ class PathFollowerNode(Node):
         return numpy.arctan2(vec[1], vec[0])
 
     def publish_debug(self, current, target):
-        c_msg = PointStamped()
-        c_msg.point.x, c_msg.point.y, c_msg.point.z = current
-        c_msg.header.stamp = rospy.Time.now()
-        t_msg = PointStamped()
-        t_msg.point.x, t_msg.point.y, t_msg.point.z = target
-        t_msg.header.stamp = c_msg.header.stamp
+        msg = PathFollowerTarget()
+        msg.header.stamp = rospy.Time.now()
+        msg.header.frame_id = "map"
+        (msg.current_position.x, msg.current_position.y,
+         msg.current_position.z) = current
+        (msg.target_position.x, msg.target_position.y,
+         msg.target_position.z) = target
 
-        self.target_pub.publish(t_msg)
-        self.current_pub.publish(c_msg)
+        self.target_pub.publish(msg)
