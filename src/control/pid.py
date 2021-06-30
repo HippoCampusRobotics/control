@@ -26,7 +26,7 @@ class PidNode(Node):
         #: in a message callback function.
         self.setpoint = 0.0
 
-        self._controller = Controller()
+        self.controller = Controller()
         self._t_last = rospy.get_time()
 
         self._dyn_reconf_pid = Server(PidControlConfig,
@@ -52,22 +52,22 @@ class PidNode(Node):
             dict: The actual parameters that are currently applied.
         """
         with self.data_lock:
-            self._controller.p_gain = config["p"]
-            self._controller.i_gain = config["i"]
-            self._controller.d_gain = config["d"]
-            self._controller.saturation = [
+            self.controller.p_gain = config["p"]
+            self.controller.i_gain = config["i"]
+            self.controller.d_gain = config["d"]
+            self.controller.saturation = [
                 config["saturation_lower"], config["saturation_upper"]
             ]
-            self._controller.integral_limits = [
+            self.controller.integral_limits = [
                 config["integral_limit_lower"], config["integral_limit_upper"]
             ]
-            config["p"] = self._controller.p_gain
-            config["i"] = self._controller.i_gain
-            config["d"] = self._controller.d_gain
-            lower, upper = self._controller.saturation
+            config["p"] = self.controller.p_gain
+            config["i"] = self.controller.i_gain
+            config["d"] = self.controller.d_gain
+            lower, upper = self.controller.saturation
             config["saturation_lower"] = lower
             config["saturation_upper"] = upper
-            lower, upper = self._controller.integral_limits
+            lower, upper = self.controller.integral_limits
             config["integral_limit_lower"] = lower
             config["integral_limit_upper"] = upper
         return config
@@ -112,7 +112,7 @@ class PidNode(Node):
             float: Control output.
         """
         dt = self._update_dt(now)
-        u = self._controller.update(error=error, dt=dt, derror=derror)
+        u = self.controller.update(error=error, dt=dt, derror=derror)
         return u
 
 
@@ -161,8 +161,11 @@ class Controller():
         self._update_derivative(error, dt, derror)
         u = (error * self.p_gain + self._integral * self.i_gain +
              self._derivative * self.d_gain)
-        u = max(self.saturation[0], min(self.saturation[1], u))
+        u = self.constrain(u)
         return u
+
+    def constrain(self, u):
+        return max(self.saturation[0], min(self.saturation[1], u))
 
     def _update_integral(self, error, dt):
         delta_integral = dt * error

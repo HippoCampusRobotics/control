@@ -1,0 +1,84 @@
+#!/usr/bin/env python
+
+import rospy
+from control.pid import PidNode
+import multi_uuv
+from geometry_msgs.msg import PoseStamped
+from hippocampus_msgs.msg import PathFollowerTarget
+from path_planning.path_planning import Path
+import threading
+from std_msgs.msg import Float64
+
+
+class DistanceNode(PidNode):
+    def __init__(self, name):
+        super().__init__(name)
+
+        self.path = Path()
+        self.path.update_path_from_param_server()
+
+        self.vehicle_number = multi_uuv.get_vehicle_number()
+        self.target_vehicle = self.get_param("~target_vehicle",
+                                             default=self.vehicle_number - 1)
+
+        self.base_thrust = self.get_param("~base_thrust", 0.3)
+        self.setpoint = self.get_param("~default_distance", 1.0)
+        self.thrust_max = self.get_param("~thrust_max", 0.6)
+        self.thrust_min = self.get_param("~thrust_min", 0.2)
+
+        self.target_index = 0
+        self.own_index = 0
+
+        self.pubs = self.init_pubs()
+
+        self.subs = self.init_subs()
+
+    def init_pubs(self):
+        pubs = dict()
+        pubs["thrust"] = rospy.Publisher("thrust", Float64, queue_size=1)
+        pubs["distance"] = rospy.Publisher("~target_points_distance",
+                                           Float64,
+                                           queue_size=10)
+        return pubs
+
+    def init_subs(self):
+        subs = dict()
+        name = multi_uuv.get_pose_name(self.target_vehicle)
+        subs[name] = rospy.Subscriber(name, PoseStamped,
+                                      self.on_target_vehicle_pose)
+        name = multi_uuv.get_path_target_name(self.target_vehicle)
+        subs[name] = rospy.Subscriber(name, PathFollowerTarget,
+                                      self.on_target_vehicle_target)
+        name = "path_follower/target"
+        subs[name] = rospy.Subscriber(name, PathFollowerTarget,
+                                      self.on_own_target)
+
+    def on_target_vehicle_pose(self, msg: PoseStamped):
+        pass
+
+    def on_target_vehicle_target(self, msg: PathFollowerTarget):
+        with self.data_lock:
+            self.target_index = msg.target_index
+
+    def on_own_target(self, msg: PathFollowerTarget):
+        with self.data_lock:
+            rospy.logwarn_throttle(
+                1, "target: {} current: {}".format(self.target_index,
+                                                   msg.target_index))
+            dist = self.path.get_distance_between_points(
+                msg.target_index, self.target_index)
+            err = dist - self.setpoint
+            thrust = self.update_controller(err, rospy.get_time())
+            thrust = min(max(thrust + self.base_thrust, self.thrust_min),
+                         self.thrust_max)
+        self.pubs["thrust"].publish(Float64(data=thrust))
+        self.pubs["distance"].publish(Float64(data=dist))
+
+
+def main():
+    node = DistanceNode("distance_controller")
+    node.run()
+
+
+if __name__ == "__main__":
+    main()

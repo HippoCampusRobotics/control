@@ -80,5 +80,6 @@ class PathFollowerNode(Node):
          msg.current_position.z) = current
         (msg.target_position.x, msg.target_position.y,
          msg.target_position.z) = target
+        msg.target_index = self.path._target_index
 
         self.target_pub.publish(msg)

@@ -34,5 +34,6 @@ catkin_install_python(PROGRAMS
   nodes/attitude_mixer_node
   nodes/depth_control_node
   nodes/path_follower_node
+  nodes/distance_control_node
   DESTINATION ${CATKIN_PACKAGE_BIN_DESTINATION}
 )
