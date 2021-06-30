@@ -1,0 +1,8 @@
+<launch>
+    <arg name="path_file" default="$(find path_planning)/config/infinity_path.yaml" />
+    <arg name="param_file" default="$(find control)/config/distance_control_default.yaml" />
+    <node name="distance_controller" pkg="control" type="distance_control_node">
+        <rosparam file="$(arg path_file)" />
+        <rosparam file="$(arg param_file)" />
+    </node>
+</launch>
