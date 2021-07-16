@@ -36,7 +36,8 @@ class DistanceNode(PidNode):
         self.distance = 0.0
 
         self.pubs = self.init_pubs()
-
+        self.enable_service = rospy.Service("enable_distance_control", SetBool,
+                                            self.serve_enable_controller())
         self.subs = self.init_subs()
 
     def init_pubs(self):
@@ -102,7 +103,8 @@ class DistanceNode(PidNode):
                                        distance=self.distance,
                                        distance_setpoint=self.setpoint,
                                        leader_path_index=self.target_index,
-                                       path_index=self.own_index)
+                                       path_index=self.own_index,
+                                       active=self.controller_enabled)
         msg.header.stamp = rospy.Time.now()
         self.pubs["distance_debug"].publish(msg)
 
