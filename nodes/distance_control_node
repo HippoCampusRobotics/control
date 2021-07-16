@@ -82,10 +82,10 @@ class DistanceNode(PidNode):
 
     def on_own_target(self, msg: PathFollowerTarget):
         with self.data_lock:
-            self.dist = self.path.get_distance_between_points(
+            self.distance = self.path.get_distance_between_points(
                 msg.target_index, self.target_index)
             if self.controller_enabled:
-                err = self.dist - self.setpoint
+                err = self.distance - self.setpoint
                 thrust = self.update_controller(err, rospy.get_time())
             else:
                 thrust = 0
