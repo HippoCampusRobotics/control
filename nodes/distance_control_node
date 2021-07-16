@@ -43,7 +43,7 @@ class DistanceNode(PidNode):
         pubs = dict()
         pubs["thrust"] = rospy.Publisher("thrust", Float64, queue_size=1)
         pubs["distance_debug"] = rospy.Publisher("~distance_debug",
-                                                 Float64,
+                                                 DistanceControlDebug,
                                                  queue_size=30)
 
         return pubs
