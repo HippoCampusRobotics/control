@@ -6,10 +6,11 @@ import multi_uuv
 import hippolink
 import hippolink_ros
 from geometry_msgs.msg import PoseStamped
-from hippocampus_msgs.msg import PathFollowerTarget
+from hippocampus_msgs.msg import PathFollowerTarget, DistanceControlDebug
 from path_planning.path_planning import Path
 import threading
 from std_msgs.msg import Float64
+from std_srvs.srv import SetBool, SetBoolRequest, SetBoolResponse
 
 
 class DistanceNode(PidNode):
@@ -23,13 +24,16 @@ class DistanceNode(PidNode):
         self.target_vehicle = self.get_param("~target_vehicle",
                                              default=self.vehicle_number - 1)
 
-        self.base_thrust = self.get_param("~base_thrust", 0.3)
+        self.controller_enabled = True
+        self.base_thrust = self.get_param("~default_base_thrust", 0.3)
         self.setpoint = self.get_param("~default_distance", 1.0)
         self.thrust_max = self.get_param("~thrust_max", 0.6)
         self.thrust_min = self.get_param("~thrust_min", 0.2)
 
         self.target_index = 0
         self.own_index = 0
+        self.thrust = 0.0
+        self.distance = 0.0
 
         self.pubs = self.init_pubs()
 
@@ -38,9 +42,10 @@ class DistanceNode(PidNode):
     def init_pubs(self):
         pubs = dict()
         pubs["thrust"] = rospy.Publisher("thrust", Float64, queue_size=1)
-        pubs["distance"] = rospy.Publisher("~target_points_distance",
-                                           Float64,
-                                           queue_size=10)
+        pubs["distance_debug"] = rospy.Publisher("~distance_debug",
+                                                 Float64,
+                                                 queue_size=30)
+
         return pubs
 
     def init_subs(self):
@@ -54,6 +59,18 @@ class DistanceNode(PidNode):
         name = "path_follower/target"
         subs[name] = rospy.Subscriber(name, PathFollowerTarget,
                                       self.on_own_target)
+        name = "~base_thrust"
+        subs[name] = rospy.Subscriber(name, Float64, self.on_base_thrust)
+        return subs
+
+    def serve_enable_controller(self, req: SetBoolRequest):
+        with self.data_lock:
+            self.controller_enabled = req.data
+        return SetBoolResponse(success=True)
+
+    def on_base_thrust(self, msg: Float64):
+        with self.data_lock:
+            self.base_thrust = min(1.0, max(0.0, msg.data))
 
     def on_target_vehicle_pose(self, msg: PoseStamped):
         pass
@@ -64,17 +81,30 @@ class DistanceNode(PidNode):
 
     def on_own_target(self, msg: PathFollowerTarget):
         with self.data_lock:
-            rospy.logwarn_throttle(
-                1, "target: {} current: {}".format(self.target_index,
-                                                   msg.target_index))
-            dist = self.path.get_distance_between_points(
+            self.dist = self.path.get_distance_between_points(
                 msg.target_index, self.target_index)
-            err = dist - self.setpoint
-            thrust = self.update_controller(err, rospy.get_time())
-            thrust = min(max(thrust + self.base_thrust, self.thrust_min),
-                         self.thrust_max)
-        self.pubs["thrust"].publish(Float64(data=thrust))
-        self.pubs["distance"].publish(Float64(data=dist))
+            if self.controller_enabled:
+                err = self.dist - self.setpoint
+                thrust = self.update_controller(err, rospy.get_time())
+            else:
+                thrust = 0
+            self.thrust = min(max(thrust + self.base_thrust, self.thrust_min),
+                              self.thrust_max)
+        self.pubs["thrust"].publish(Float64(data=self.thrust))
+        self.publish_distance_control_debug()
+
+    def publish_distance_control_debug(self):
+        with self.data_lock:
+            msg = DistanceControlDebug(thrust_min=self.thrust_min,
+                                       thrust_max=self.thrust_max,
+                                       base_thrust=self.base_thrust,
+                                       thrust=self.thrust,
+                                       distance=self.distance,
+                                       distance_setpoint=self.setpoint,
+                                       leader_path_index=self.target_index,
+                                       path_index=self.own_index)
+        msg.header.stamp = rospy.Time.now()
+        self.pubs["distance_debug"].publish(msg)
 
 
 def main():

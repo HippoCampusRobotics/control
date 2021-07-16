@@ -4,6 +4,7 @@ import rospy
 from dynamic_reconfigure.server import Server
 from hippocampus_common.node import Node
 from std_msgs.msg import Float64
+from hippocampus_msgs.msg import PidDebug
 
 from control.cfg import PidControlConfig
 
@@ -31,7 +32,9 @@ class PidNode(Node):
 
         self._dyn_reconf_pid = Server(PidControlConfig,
                                       self._on_pid_reconfigure)
-
+        self.pid_debug_pub = rospy.Publisher("~pid_debug",
+                                             PidDebug,
+                                             queue_size=30)
         self.setpoint_sub = rospy.Subscriber("~setpoint", Float64,
                                              self._on_setpoint)
 
@@ -98,6 +101,24 @@ class PidNode(Node):
         self._t_last = now
         return dt
 
+    def publish_pid_debug(self):
+        """Publish debug information.
+        """
+        with self.data_lock:
+            msg = PidDebug(error=self.controller._error,
+                           error_derivative=self.controller._derivative,
+                           error_integral=self.controller._integral,
+                           setpoint=self.setpoint,
+                           p_gain=self.controller.p_gain,
+                           i_gain=self.controller.i_gain,
+                           d_gain=self.controller.i_gain,
+                           u_p=self.controller._u_p,
+                           u_i=self.controller._u_i,
+                           u_d=self.controller._u_d,
+                           u=self.controller._u)
+        msg.header.stamp = rospy.Time.now()
+        self.pid_debug_pub.publish(msg)
+
     def update_controller(self, error, now, derror=None):
         """Computes the updated PID controller's output.
 
@@ -113,6 +134,7 @@ class PidNode(Node):
         """
         dt = self._update_dt(now)
         u = self.controller.update(error=error, dt=dt, derror=derror)
+        self.publish_pid_debug()
         return u
 
 
@@ -139,9 +161,14 @@ class Controller():
         self.d_gain = d_gain
         self.saturation = [-100, 100]
         self.integral_limits = [-1, 1]
+        self._error = 0.0
         self._integral = 0.0
         self._derivative = 0.0
         self._last_error = 0.0
+        self._u_p = 0.0
+        self._u_i = 0.0
+        self._u_d = 0.0
+        self._u = 0.0
 
     def update(self, error, dt, derror=None):
         """Compute the control output.
@@ -157,12 +184,14 @@ class Controller():
         Returns:
             float: Control output.
         """
+        self._error = error
         self._update_integral(error, dt)
         self._update_derivative(error, dt, derror)
-        u = (error * self.p_gain + self._integral * self.i_gain +
-             self._derivative * self.d_gain)
-        u = self.constrain(u)
-        return u
+        self._u_p = error * self.p_gain
+        self._u_i = self._integral * self.i_gain
+        self._u_d = self._derivative * self.d_gain
+        self._u = self.constrain(self._u_p + self._u_i + self._u_d)
+        return self._u
 
     def constrain(self, u):
         return max(self.saturation[0], min(self.saturation[1], u))

@@ -5,7 +5,7 @@ saturation_lower: -1.0
 saturation_upper: 1.0
 integral_limit_lower: 0
 integral_limit_upper: 0
-base_thrust: 0.3
+default_base_thrust: 0.3
 default_distance: 1.0
 thrust_max: 0.6
 thrust_min: 0.2
