@@ -37,7 +37,7 @@ class DistanceNode(PidNode):
 
         self.pubs = self.init_pubs()
         self.enable_service = rospy.Service("enable_distance_control", SetBool,
-                                            self.serve_enable_controller())
+                                            self.serve_enable_controller)
         self.subs = self.init_subs()
 
     def init_pubs(self):
