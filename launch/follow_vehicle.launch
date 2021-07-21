@@ -1,5 +1,6 @@
 <launch>
     <arg name="use_ground_truth" />
+    <arg name="path_file" default="$(find path_planning)/config/infinity_path.yaml" />
     <include file="$(find control)/launch/attitude_control.launch" pass_all_args="true" />
     <include file="$(find control)/launch/distance_control_node.launch" pass_all_args="true" />
 </launch>
