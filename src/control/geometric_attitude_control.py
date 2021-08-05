@@ -4,6 +4,10 @@ import numpy
 import rospy
 import tf.transformations
 from hippocampus_common.node import Node
+from dynamic_reconfigure.server import Server
+from control.cfg import GeometricControlConfig
+from geometry_msgs.msg import TwistStamped, PoseStamped
+from mavros_msgs.msg import AttitudeTarget
 
 
 class AttitudeController(object):
@@ -30,8 +34,49 @@ class AttitudeControllerNode(Node):
                          anonymous=anonymous,
                          disable_signals=disable_signals)
         self.data_lock = threading.RLock()
+        self.controller = AttitudeController()
 
-        self.vehicle_type = self.get_param("vehicle_type")
-        if self.vehicle_type is None:
-            rospy.logfatal("No vehicle_type param specified. Exiting")
-            exit(1)
+        self.geom_reconfigure_server = Server(GeometricControlConfig,
+                                              self._on_geom_reconfigure)
+
+        self.omega = numpy.array([0.0, 0.0, 0.0], dtype=float)
+        self.omega_desired = numpy.array([0.0, 0.0, 0.0], dtype=float)
+        self.attitude = numpy.array([0.0, 0.0, 0.0, 1.0], dtype=float)
+        self.attitude_desired = numpy.array([0.0, 0.0, 0.0, 1.0], dtype=float)
+
+        self.velocity_sub = rospy.Subscriber(
+            "mavros/local_position/velocity_body", TwistStamped,
+            self.on_velocity_body)
+        self.attitude_sub = rospy.Subscriber("mavros/local_position/pose",
+                                             PoseStamped, self.on_mavros_pose)
+
+        self.setpoint_sub = rospy.Subscriber("~setpoint", AttitudeTarget,
+                                             self.on_attitude_setpoint)
+
+    def on_mavros_pose(self, msg: PoseStamped):
+        q = msg.pose.orientation
+        with self.data_lock:
+            self.attitude[:] = [q.x, q.y, q.z, q.w]
+        # TODO apply control
+
+    def on_velocity_body(self, msg: TwistStamped):
+        omega = msg.twist.angular
+        with self.data_lock:
+            self.omega[:] = [omega.x, omega.y, omega.z]
+
+    def on_attitude_setpoint(self, msg: AttitudeTarget):
+        with self.data_lock:
+            q = msg.orientation
+            r = msg.body_rate
+            self.attitude_desired[:] = [q.x, q.y, q.z, q.w]
+            self.omega_desired[:] = [r.x, r.y, r.z]
+
+    def _on_geom_reconfigure(self, config, level):
+        with self.data_lock:
+            self.controller.p_gains[:] = [
+                config["P_roll"], config["P_pitch"], config["P_yaw"]
+            ]
+            self.controller.d_gains[:] = [
+                config["D_roll"], config["D_pitch"], config["D_yaw"]
+            ]
+        return config
