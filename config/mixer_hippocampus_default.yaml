@@ -1,0 +1,25 @@
+mixer:
+  - [
+      { channel: 0, scaling: -0.4, limit: 0.4 },
+      { channel: 1, scaling: -0.4, limit: 0.4 },
+      { channel: 2, scaling: 0.4, limit: 0.4 },
+      { channel: 3, scaling: 0.4, limit: 0.4 },
+    ]
+  - [
+      { channel: 0, scaling: 0.4, limit: 0.4 },
+      { channel: 1, scaling: -0.4, limit: 0.4 },
+      { channel: 2, scaling: -0.4, limit: 0.4 },
+      { channel: 3, scaling: 0.4, limit: 0.4 },
+    ]
+  - [
+      { channel: 0, scaling: -0.4, limit: 0.4 },
+      { channel: 1, scaling: 0.4, limit: 0.4 },
+      { channel: 2, scaling: -0.4, limit: 0.4 },
+      { channel: 3, scaling: 0.4, limit: 0.4 },
+    ]
+  - [
+      { channel: 0, scaling: 0.4, limit: 0.4 },
+      { channel: 1, scaling: 0.4, limit: 0.4 },
+      { channel: 2, scaling: 0.4, limit: 0.4 },
+      { channel: 3, scaling: 0.4, limit: 0.4 },
+    ]

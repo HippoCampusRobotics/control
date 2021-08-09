@@ -1,0 +1,93 @@
+#!/usr/bin/env python
+
+import rospy
+from hippocampus_msgs.msg import ActuatorControls
+from hippocampus_common.node import Node
+from mavros_msgs.msg import AttitudeTarget
+
+
+class SimpleMixer(object):
+    def __init__(self, mixer_data=None):
+        self.n_actuators = len(mixer_data)
+        self.mapping = mixer_data
+
+    def mix(self, controls):
+        output = [0.0] * 8
+        if self.mapping is not None:
+            for i_motor in range(self.n_actuators):
+                output[i_motor] = sum([
+                    max(
+                        min(controls[chan["channel"]] * chan["scaling"],
+                            chan["limit"]), -chan["limit"])
+                    for chan in self.mapping[i_motor]
+                ])
+        return output
+
+
+class MixerNode(Node):
+    def __init__(self, name, anonymous=False, disable_signals=False):
+        super().__init__(name,
+                         anonymous=anonymous,
+                         disable_signals=disable_signals)
+        self.vehicle_type = self.get_param("vehicle_type")
+        if self.vehicle_type is None:
+            rospy.logfatal("'vehicle_type' param not set. Exiting...")
+            exit(1)
+        if self.vehicle_type == "hippocampus":
+            self.mavros_pub = rospy.Publisher("mavros/setpoint_raw/attitude",
+                                              AttitudeTarget,
+                                              queue_size=1)
+            self.publish = self.publish_attitude_target
+        elif self.vehicle_type == "bluerov":
+            from mavros_msgs.msg import MotorSetpoint
+            self.mavros_pub = rospy.Publisher("mavros/setpoint_motor/setpoint",
+                                              MotorSetpoint,
+                                              queue_size=1)
+            self.publish = self.publish_motor_septoints
+        self.mixer_data = None
+        self.mixer = None
+        self.update_mixer_from_server()
+        self.actuator_controls_sub = rospy.Subscriber("actuator_controls_0",
+                                                      ActuatorControls,
+                                                      self.on_actuator_controls)
+
+    def on_actuator_controls(self, msg: ActuatorControls):
+        if self.mixer is None:
+            rospy.logerr_throttle(3.0, "No valid mixer info provided!")
+        else:
+            motor_commands = self.mixer.mix(msg.control)
+            self.publish(motor_commands)
+
+    def publish_motor_septoints(self, motor_commands):
+        out = MotorSetpoint()
+        out.header.stamp = rospy.Time.now()
+        for i in range(len(out.setpoint)):
+            out.setpoint[i] = motor_commands[i]
+        self.mavros_pub.publish(out)
+
+    def publish_attitude_target(self, motor_commands):
+        out = AttitudeTarget()
+        out.header.stamp = rospy.Time.now()
+        out.thrust = motor_commands[3]
+        # negative signs needed because of mavros frame conversion frd <-> flu
+        out.body_rate.x = motor_commands[0]
+        out.body_rate.y = -motor_commands[1]
+        out.body_rate.z = -motor_commands[2]
+        self.mavros_pub.publish(out)
+
+    def update_mixer_from_server(self):
+        mixer_data = self.get_param("~mixer")
+        if mixer_data is not None:
+            self.mixer_data = mixer_data
+            self.mixer = SimpleMixer(self.mixer_data)
+            return True
+        return False
+
+
+def main():
+    n = MixerNode("actuator_mixer")
+    n.run()
+
+
+if __name__ == "__main__":
+    main()

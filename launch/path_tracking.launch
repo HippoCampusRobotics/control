@@ -1,7 +1,15 @@
 <launch>
     <arg name="use_ground_truth" />
+    <arg name="use_external_controller" />
+    <arg if="$(arg use_external_controller)" name="mixer_file" />
     <arg name="path_file" default="$(find path_planning)/config/infinity_path.yaml" />
     <include file="$(find control)/launch/attitude_mixer_node.launch" pass_all_args="true" />
     <include file="$(find control)/launch/depth_control_node.launch" pass_all_args="true" />
     <include file="$(find control)/launch/path_follower_node.launch" pass_all_args="true" />
+    <group if="$(arg use_external_controller)">
+        <include file="$(find control)/launch/geom_att_ctrl_node.launch" />
+        <include file="$(find control)/launch/actuator_mixer_node.launch">
+            <arg name="mixer_file" value="$(arg mixer_file)" />
+        </include>
+    </group>
 </launch>

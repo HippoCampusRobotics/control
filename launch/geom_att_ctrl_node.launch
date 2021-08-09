@@ -1,0 +1,3 @@
+<launch>
+    <node name="attitude_controller" pkg="control" type="geom_att_ctrl_node" output="screen" />
+</launch>
