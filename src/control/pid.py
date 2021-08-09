@@ -111,7 +111,7 @@ class PidNode(Node):
                            setpoint=self.setpoint,
                            p_gain=self.controller.p_gain,
                            i_gain=self.controller.i_gain,
-                           d_gain=self.controller.i_gain,
+                           d_gain=self.controller.d_gain,
                            u_p=self.controller._u_p,
                            u_i=self.controller._u_i,
                            u_d=self.controller._u_d,
@@ -215,6 +215,7 @@ class Controller():
         """
         if derror is None:
             self._derivative = (error - self._last_error) / dt
+            self._last_error = error
         else:
             self._derivative = derror
 
