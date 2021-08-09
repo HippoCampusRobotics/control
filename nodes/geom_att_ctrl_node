@@ -1,0 +1,12 @@
+#!/usr/bin/env python
+
+from control.geometric_attitude_control import AttitudeControllerNode
+
+
+def main():
+    n = AttitudeControllerNode("attitude_controller")
+    n.run()
+
+
+if __name__ == "__main__":
+    main()

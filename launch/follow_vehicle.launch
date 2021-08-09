@@ -1,6 +1,8 @@
 <launch>
     <arg name="use_ground_truth" />
     <arg name="path_file" default="$(find path_planning)/config/infinity_path.yaml" />
-    <include file="$(find control)/launch/attitude_control.launch" pass_all_args="true" />
+    <arg name="use_external_controller" />
+    <arg if="$(arg use_external_controller)" name="mixer_file" />
+    <include file="$(find control)/launch/path_tracking.launch" pass_all_args="true" />
     <include file="$(find control)/launch/distance_control_node.launch" pass_all_args="true" />
 </launch>

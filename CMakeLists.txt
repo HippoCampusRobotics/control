@@ -18,7 +18,6 @@ catkin_python_setup()
 generate_dynamic_reconfigure_options(
   cfg/PidControl.cfg
   cfg/CarrotControl.cfg
-  cfg/GeometricControl.cfg
 )
 
 catkin_package()
@@ -36,5 +35,7 @@ catkin_install_python(PROGRAMS
   nodes/depth_control_node
   nodes/path_follower_node
   nodes/distance_control_node
+  nodes/geom_att_ctrl_node
+  nodes/actuator_mixer_node
   DESTINATION ${CATKIN_PACKAGE_BIN_DESTINATION}
 )

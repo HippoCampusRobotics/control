@@ -1,0 +1,6 @@
+<launch>
+    <arg name="mixer_file" />
+    <node name="actuator_mixer" pkg="control" type="actuator_mixer_node" output="screen" >
+        <rosparam file="$(arg mixer_file)" />
+    </node>
+</launch>
