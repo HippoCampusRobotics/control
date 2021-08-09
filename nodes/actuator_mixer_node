@@ -4,6 +4,10 @@ import rospy
 from hippocampus_msgs.msg import ActuatorControls
 from hippocampus_common.node import Node
 from mavros_msgs.msg import AttitudeTarget
+try:
+    from mavros_msgs.msg import MotorSetpoint
+except ImportError:
+    pass
 
 
 class SimpleMixer(object):
@@ -39,7 +43,6 @@ class MixerNode(Node):
                                               queue_size=1)
             self.publish = self.publish_attitude_target
         elif self.vehicle_type == "bluerov":
-            from mavros_msgs.msg import MotorSetpoint
             self.mavros_pub = rospy.Publisher("mavros/setpoint_motor/setpoint",
                                               MotorSetpoint,
                                               queue_size=1)
