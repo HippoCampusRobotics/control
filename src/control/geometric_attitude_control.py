@@ -23,13 +23,11 @@ class AttitudeController(object):
         R_desired = tf.transformations.quaternion_matrix(q_desired)
         error_R = (numpy.matmul(R_desired.transpose(), R) -
                    numpy.matmul(R.transpose(), R_desired)) * 0.5
-        error_R_vec = numpy.array([error_R[2, 1], error_R[0, 2], error_R[1, 0]],
+        error_R_vec = numpy.array([error_R[1, 2], error_R[2, 0], error_R[0, 1]],
                                   dtype=float)
         error_omega = omega_actual - omega_desired
-        # dont know why i have to change the sign for roll
-        error_omega[0] = -error_omega[0]
 
-        T = error_R_vec * self.p_gains + error_omega * self.d_gains
+        T = error_R_vec * self.p_gains - error_omega * self.d_gains
         return numpy.clip(T, -1.0, 1.0)
 
 
