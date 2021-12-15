@@ -129,11 +129,13 @@ class TwisterNode(Node):
     def run(self):
         rospy.loginfo("Initializing gains.")
         self.init_gains()
+        twist_toggle = True
 
         while not rospy.is_shutdown():
             if self.is_time_for_twist():
-                if self.do_twist():
+                if self.do_twist(twist_toggle):
                     rospy.loginfo("Twisted successfully.")
+                    twist_toggle = not twist_toggle
                 else:
                     rospy.loginfo("Twist failed.")
                 self.twist_done = True
@@ -164,8 +166,12 @@ class TwisterNode(Node):
             if self.twist_finished():
                 rospy.loginfo("Twist finished.")
                 return True
-            self.roll_angle_pub.publish(
-                Float64((self.roll_angle + 90) / 180.0 * math.pi))
+            if inverse:
+                self.roll_angle_pub.publish(
+                    Float64((self.roll_angle - 90) / 180.0 * math.pi))
+            else:
+                self.roll_angle_pub.publish(
+                    Float64((self.roll_angle + 90) / 180.0 * math.pi))
             self.rate.sleep()
 
     def twist_finished(self):
