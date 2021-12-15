@@ -1,0 +1,204 @@
+#!/usr/bin/env python
+from hippocampus_common.node import Node
+from dynamic_reconfigure.server import Server
+from control.cfg import TwisterConfig
+import threading
+import rospy
+from std_msgs.msg import Float64
+from geometry_msgs.msg import PoseStamped
+import tf.transformations
+import math
+from hippocampus_msgs.msg import PathFollowerTarget
+from mavros_msgs.srv import ParamGet, ParamSet, ParamSetRequest
+from mavros_msgs.msg import ParamValue
+
+P_GAIN_NAME = "UUV_ROLL_P"
+D_GAIN__NAME = "UUV_ROLL_D"
+
+
+class TwisterNode(Node):
+    def __init__(self, name, anonymous=False, disable_signals=False):
+        super().__init__(name,
+                         anonymous=anonymous,
+                         disable_signals=disable_signals)
+        self.data_lock = threading.RLock()
+        self.start_angle = 0.0
+        self.left_threshold = False
+        self.twist_speed = 0.0
+        self.twister_enabled = False
+        self.twist_start_index = 0
+        self.current_path_index = 0
+        self.roll_angle = 0.0
+        self.timeout = 0.0
+        self.angle_threshold = 0.0
+        self.index_threshold = 0
+        self.twist_done = False
+
+        # standard gains get overriden by px4 params
+        self.standard_p_gain = 0.0
+        self.standard_d_gain = 0.0
+        self.twist_d_gain = 1.0
+        self.twist_p_gain = 0.0
+
+        self.rate = rospy.Rate(50)
+
+        self.twister_dyn_server = Server(TwisterConfig,
+                                         self.serve_twister_reconfigure)
+
+        self.get_px4_param = rospy.ServiceProxy("mavros/param/get", ParamGet)
+        self.set_px4_param = rospy.ServiceProxy("mavros/param/set", ParamSet)
+
+        self.roll_speed_pub = rospy.Publisher("roll_speed",
+                                              Float64,
+                                              queue_size=1)
+        self.roll_angle_pub = rospy.Publisher("roll_angle",
+                                              Float64,
+                                              queue_size=1)
+        self.pose_sub = rospy.Subscriber("mavros/local_position/pose",
+                                         PoseStamped,
+                                         self.on_pose,
+                                         queue_size=1)
+        self.path_target_sub = rospy.Subscriber("path_follower/target",
+                                                PathFollowerTarget,
+                                                self.on_path_target,
+                                                queue_size=1)
+
+    def serve_twister_reconfigure(self, config, _):
+        with self.data_lock:
+            self.twister_enabled = config["enabled"]
+            self.twist_start_index = config["twist_start_index"]
+            self.twist_speed = config["twist_speed"]
+            self.timeout = config["timeout"]
+            self.angle_threshold = config["angle_threshold"]
+            self.index_threshold = config["index_threshold"]
+        return config
+
+    def get_px4_gains(self):
+        p_gain = self._get_px4_gain(P_GAIN_NAME)
+        d_gain = self._get_px4_gain(D_GAIN__NAME)
+        return p_gain, d_gain
+
+    def set_px4_gains(self, p_gain, d_gain):
+        p_success = self.set_px4_gain(P_GAIN_NAME, p_gain)
+        d_success = self.set_px4_gain(D_GAIN__NAME, d_gain)
+        return p_success and d_success
+
+    def set_px4_gain(self, name, value):
+        try:
+            value = ParamValue(real=value)
+            ret = self.set_px4_param(param_id=name, value=value)
+        except rospy.ServiceException:
+            rospy.logerr_throttle_identical(1.0, "Failed to set '%s'", name)
+            return False
+        else:
+            return ret.success
+
+    def _get_px4_gain(self, name):
+        try:
+            ret = self.get_px4_param(param_id=name)
+        except rospy.ServiceException:
+            rospy.logerr_throttle_identical(1.0, "Failed to get '%s'", name)
+        else:
+            if ret.success:
+                return ret.value.real
+            else:
+                rospy.logerr_throttle_identical(1.0, "Failed to get '%s'", name)
+        return None
+
+    def init_gains(self):
+        r = rospy.Rate(1.0)
+        while not rospy.is_shutdown():
+            gains = self.get_px4_gains()
+            if gains[0] is not None and gains[1] is not None:
+                self.standard_p_gain = gains[0]
+                self.standard_d_gain = gains[1]
+                return
+            r.sleep()
+
+    def on_pose(self, msg: PoseStamped):
+        q = msg.pose.orientation
+        roll = tf.transformations.euler_from_quaternion([q.x, q.y, q.z, q.w
+                                                         ])[0] * 180 / math.pi
+        with self.data_lock:
+            self.roll_angle = roll
+
+    def on_path_target(self, msg: PathFollowerTarget):
+        with self.data_lock:
+            self.current_path_index = msg.target_index
+
+    def run(self):
+        rospy.loginfo("Initializing gains.")
+        self.init_gains()
+
+        while not rospy.is_shutdown():
+            if self.is_time_for_twist():
+                if self.do_twist():
+                    rospy.loginfo("Twisted successfully.")
+                else:
+                    rospy.loginfo("Twist failed.")
+                self.twist_done = True
+            if self.twist_done and self.twist_start_index + self.index_threshold < self.current_path_index:
+                self.twist_done = False
+            self.roll_angle_pub.publish(
+                Float64(self.start_angle / 180.0 * math.pi))
+            self.rate.sleep()
+
+    def is_time_for_twist(self):
+        with self.data_lock:
+            if self.twister_enabled and not self.twist_done:
+                tmp = self.index_threshold + self.twist_start_index
+                return (tmp >= self.current_path_index >=
+                        self.twist_start_index)
+            return False
+
+    def do_twist(self, inverse=False):
+        self.twist_done = True
+        self.left_threshold = False
+        t_start = rospy.get_time()
+        with self.data_lock:
+            t_end = t_start + self.timeout
+        rospy.loginfo("Starting twist.")
+        while not rospy.is_shutdown():
+            if rospy.get_time() > t_end:
+                return False
+            if self.twist_finished():
+                rospy.loginfo("Twist finished.")
+                return True
+            self.roll_angle_pub.publish(
+                Float64((self.roll_angle + 90) / 180.0 * math.pi))
+            self.rate.sleep()
+
+    def twist_finished(self):
+        with self.data_lock:
+            diff = abs(self.start_angle - self.roll_angle)
+            if self.left_threshold:
+                if diff <= self.angle_threshold:
+                    return True
+            else:
+                if diff >= self.angle_threshold + 10:
+                    self.left_threshold = True
+            return False
+
+    def switch_to_twist_mode(self):
+        self.left_threshold = False
+        if not self.set_px4_gains(self.twist_p_gain, self.twist_d_gain):
+            rospy.logwarn("Could not set gains for twist mode.")
+            return False
+        self.roll_speed_pub.publish(Float64(self.twist_speed))
+        return True
+
+    def switch_to_normal_mode(self):
+        if not self.set_px4_gains(self.standard_p_gain, self.standard_d_gain):
+            rospy.logwarn("Could not set gains for normal mode.")
+            return False
+        self.roll_speed_pub.publish(Float64(0.0))
+        return True
+
+
+def main():
+    n = TwisterNode("roll_controller")
+    n.run()
+
+
+if __name__ == "__main__":
+    main()

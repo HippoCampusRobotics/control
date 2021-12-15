@@ -70,6 +70,7 @@ class MixerNode(Node):
 
     def publish_attitude_target(self, motor_commands):
         out = AttitudeTarget()
+        out.type_mask = out.IGNORE_ATTITUDE
         out.header.stamp = rospy.Time.now()
         out.thrust = motor_commands[3]
         # negative signs needed because of mavros frame conversion frd <-> flu

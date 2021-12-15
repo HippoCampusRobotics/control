@@ -18,6 +18,7 @@ catkin_python_setup()
 generate_dynamic_reconfigure_options(
   cfg/PidControl.cfg
   cfg/CarrotControl.cfg
+  cfg/Twister.cfg
 )
 
 catkin_package()
@@ -37,5 +38,6 @@ catkin_install_python(PROGRAMS
   nodes/distance_control_node
   nodes/geom_att_ctrl_node
   nodes/actuator_mixer_node
+  nodes/twister_node
   DESTINATION ${CATKIN_PACKAGE_BIN_DESTINATION}
 )
