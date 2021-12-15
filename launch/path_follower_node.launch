@@ -1,8 +1,10 @@
 <launch>
     <arg name="use_ground_truth" />
-    <arg name="path_file" default="$(find path_planning)/config/infinity_path.yaml"/>
+    <arg name="path_file" default="$(find path_planning)/config/infinity_path.yaml" />
+
     <node name="path_follower" pkg="control" type="path_follower_node" output="screen">
         <param name="use_ground_truth" value="$(arg use_ground_truth)" />
         <rosparam file="$(arg path_file)" />
     </node>
+
 </launch>
