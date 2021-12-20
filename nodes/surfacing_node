@@ -10,9 +10,9 @@ import threading
 
 class SurfacingNode(Node):
     def __init__(self, name, anonymous=False, disable_signals=False):
-        super().__init__(name,
-                         anonymous=anonymous,
-                         disable_signals=disable_signals)
+        super(SurfacingNode, self).__init__(name,
+                                            anonymous=anonymous,
+                                            disable_signals=disable_signals)
         self.cmd = rospy.ServiceProxy("mavros/cmd/command", CommandLong)
         rospy.wait_for_service("mavros/cmd/command")
         self.thrust_pub = rospy.Publisher("thrust", Float64, queue_size=1)
