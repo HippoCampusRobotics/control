@@ -14,6 +14,8 @@
 
     <include if="$(arg do_twist)" file="$(find control)/launch/node_twister.launch" pass_all_args="true" />
 
+    <include if="$(arg do_surfacing)" file="$(find control)/launch/node_surfacing.launch" />
+
     <group if="$(arg use_external_controller)">
         <include file="$(find control)/launch/geom_att_ctrl_node.launch" />
         <include file="$(find control)/launch/actuator_mixer_node.launch">

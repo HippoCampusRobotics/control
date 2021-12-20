@@ -1,0 +1,102 @@
+import rospy
+
+from hippocampus_common.node import Node
+from hippocampus_msgs.msg import PathFollowerTarget
+from mavros_msgs.srv import CommandLong
+from std_msgs.msg import Float64
+import threading
+
+
+class SurfacingNode(Node):
+    def __init__(self, name, anonymous=False, disable_signals=False):
+        super().__init__(name,
+                         anonymous=anonymous,
+                         disable_signals=disable_signals)
+        self.cmd = rospy.ServiceProxy("mavros/cmd/command", CommandLong)
+        rospy.wait_for_service("mavros/cmd/command")
+        self.thrust_pub = rospy.Publisher("thrust", Float64, queue_size=1)
+        self.depth_pub = rospy.Publisher("depth_control/setpoint",
+                                         Float64,
+                                         queue_size=1)
+        self.data_lock = threading.RLock()
+        self.surface_zone = [15, 35]
+        self.normal_depth = -2
+        self.surface_depth = 100.0
+        self.normal_thrust = 0.3
+        self.surface_thrust = 0.5
+        self.rate = rospy.Rate(50)
+        self.current_target_index = 0
+        self.in_target_zone_flag = False
+        self.lap_counter = 0
+        self.n_laps = 2
+        self.timeout = 3.0
+
+        self.target_index_sub = rospy.Subscriber("path_follower/target",
+                                                 PathFollowerTarget,
+                                                 self.on_path_target,
+                                                 queue_size=1)
+
+    def disarm(self):
+        try:
+            self.cmd(command=400, param1=0, param2=21196)
+        except rospy.ServiceException:
+            rospy.logerr("Failed to disarm vehicle! Service exception raised.")
+
+    def on_path_target(self, msg):
+        with self.data_lock:
+            self.current_target_index = msg.target_index
+
+    def run(self):
+        while not rospy.is_shutdown():
+            self.update_laps()
+
+            if self.time_to_surface():
+                self.do_surfacing()
+            self.thrust_pub.publish(Float64(self.normal_thrust))
+            self.depth_pub.publish(Float64(self.normal_depth))
+            self.rate.sleep()
+
+    def do_surfacing(self):
+        rospy.loginfo("Starting to surface!")
+        t_timeout = rospy.get_time() + self.timeout
+        while not rospy.is_shutdown():
+            if rospy.get_time() > t_timeout:
+                rospy.loginfo("Surfacing finished.")
+                self.disarm()
+                self.lap_counter = 0
+                return
+            self.thrust_pub.publish(Float64(self.surface_thrust))
+            self.depth_pub.publish(Float64(self.surface_depth))
+
+    def time_to_surface(self):
+        if self.target_in_zone() and self.lap_counter >= self.n_laps:
+            return True
+        return False
+
+    def update_laps(self):
+        current_state = self.target_in_zone()
+        with self.data_lock:
+            if not self.in_target_zone_flag and current_state:
+                self.lap_counter += 1
+                rospy.loginfo("Lap completed. Current lap: %d",
+                              self.lap_counter)
+            self.in_target_zone_flag = current_state
+
+    def target_in_zone(self):
+        with self.data_lock:
+            if (self.surface_zone[0] < self.current_target_index <
+                    self.surface_zone[1]):
+                rospy.loginfo_throttle(1.0, "In surface zone")
+                return True
+            else:
+                rospy.loginfo_throttle(1.0, "Not in target zone")
+                return False
+
+
+def main():
+    n = SurfacingNode("surfacing_node")
+    n.run()
+
+
+if __name__ == "__main__":
+    main()

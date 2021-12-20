@@ -1,0 +1,3 @@
+<launch>
+    <node pkg="control" type="surfacing_node" name="surfacing_node" output="screen" />
+</launch>
