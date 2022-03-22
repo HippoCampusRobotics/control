@@ -1,0 +1,78 @@
+#!/usr/bin/env python
+import rospy
+from sensor_msgs.msg import Joy
+from std_msgs.msg import Float64
+from hippocampus_common.node import Node
+
+
+class JoyMapperNode(Node):
+    def __init__(self, name):
+        super(JoyMapperNode, self).__init__(name)
+
+        rospy.logwarn("hello")
+        self.mapping = self.read_params()
+
+        # self.vertical_thrust_pub = rospy.Publisher("vertical_thrust_input",
+        #                                           Float64,
+        #                                           queue_size=1)
+        # self.lateral_thrust_pub = rospy.Publisher("lateral_thrust",
+        #                                          Float64,
+        #                                          queue_size=1)
+        self.thrust_pub = rospy.Publisher("thrust_joy", Float64, queue_size=1)
+        self.roll_pub = rospy.Publisher("roll_joy", Float64, queue_size=1)
+        self.pitch_pub = rospy.Publisher("pitch_joy", Float64, queue_size=1)
+        self.yaw_pub = rospy.Publisher("yaw_joy", Float64, queue_size=1)
+
+        rospy.Subscriber("joy", Joy, self.on_joy, queue_size=10)
+
+    def read_params(self):
+        # left toggle 
+        # <-> [0]
+        # ^-v [1]
+        # shoulder left [2] 
+        # right toggle
+        # <-> [3]
+        # ^-v [4]
+        # shoulder left [5] 
+        # cross
+        # <-> [6]
+        # ^-v [7]
+
+
+        mapping = {}
+        mapping["thrust"] = self.get_param("~thrust_axis", 1)
+        mapping["roll"] = self.get_param("~roll_axis", 0)
+        
+        mapping["yaw"] = self.get_param("~yaw_axis", 3)
+        mapping["pitch"] = self.get_param("~pitch_axis", 4)
+        
+        return mapping
+
+    def on_joy(self, msg):
+        for axis in self.mapping:
+            msg_out = Float64()
+            pub = self.get_pub(axis)
+            index = self.mapping[axis]
+            msg_out.data = msg.axes[index]
+            pub.publish(msg_out)
+
+    def get_pub(self, axis):
+        if axis == "thrust":
+            return self.thrust_pub
+        elif axis == "roll":
+            return self.roll_pub
+        elif axis == "pitch":
+            return self.pitch_pub
+        elif axis == "yaw":
+            return self.yaw_pub
+        else:
+            return None
+
+
+def main():
+    node = JoyMapperNode("joystick_mapper")
+    node.run()
+
+
+if __name__ == "__main__":
+    main()

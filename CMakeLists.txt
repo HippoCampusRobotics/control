@@ -39,5 +39,7 @@ catkin_install_python(PROGRAMS
   nodes/geom_att_ctrl_node
   nodes/actuator_mixer_node
   nodes/twister_node
+  nodes/joystick_node
+  nodes/joystick_control_node
   DESTINATION ${CATKIN_PACKAGE_BIN_DESTINATION}
 )
