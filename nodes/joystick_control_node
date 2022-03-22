@@ -1,0 +1,134 @@
+import threading
+
+import numpy
+import rospy
+from dynamic_reconfigure.server import Server
+# from hippocampus_msgs.msg import PathFollowerTarget
+from geometry_msgs.msg import PoseStamped, TwistStamped
+from hippocampus_common.node import Node
+from nav_msgs.msg import Odometry
+from std_msgs.msg import Float64
+
+#from control.cfg import CarrotControlConfig
+
+
+class JoystickControlNode(Node):
+    def __init__(self, name):
+        super(JoystickControlNode, self).__init__(name)
+        self.data_lock = threading.RLock()
+
+        self.roll_cmd = 0.0
+        self.pitch_cmd = 0.0
+        self.yaw_cmd = 0.0
+        self.thrust_cmd = 0.0
+
+        # self.target_pub = rospy.Publisher("~target",
+        #                                   PathFollowerTarget,
+        #                                   queue_size=30)
+
+        # if self.use_ground_truth:
+        #     self.ground_truth_sub = rospy.Subscriber("ground_truth/state",
+        #                                              Odometry,
+        #                                              self.on_local_pose,
+        #                                              queue_size=1)
+        # else:
+        #     self.local_pose_sub = rospy.Subscriber("mavros/local_position/pose",
+        #                                            PoseStamped,
+        #                                            self.on_local_pose,
+        #                                            queue_size=1)
+        
+        
+        self.thrust_pub = rospy.Publisher("thrust", Float64, queue_size=1)
+        self.roll_pub = rospy.Publisher("roll", Float64, queue_size=1)
+        self.pitch_pub = rospy.Publisher("pitch", Float64, queue_size=1)
+        self.yaw_pub = rospy.Publisher("yaw", Float64, queue_size=1)
+
+
+        self.thrust_cmd_sub = rospy.Subscriber("thrust_joy", 
+                                               Float64,
+                                               self.on_thrust,
+                                               queue_size=1)
+        
+        self.yaw_cmd_sub = rospy.Subscriber("yaw_joy", 
+                                               Float64,
+                                               self.on_yaw,
+                                               queue_size=1)
+
+        self.pitch_cmd_sub = rospy.Subscriber("pitch_joy", 
+                                               Float64,
+                                               self.on_pitch,
+                                               queue_size=1)
+        
+        self.roll_cmd_sub = rospy.Subscriber("roll_joy", 
+                                               Float64,
+                                               self.on_roll,
+                                               queue_size=1)
+        
+        self.velocity_sub = rospy.Subscriber("mavros/local_position/velocity_body", 
+                                                TwistStamped,
+                                                self.on_velocity_body)
+        self.attitude_sub = rospy.Subscriber("mavros/local_position/pose",
+                                             PoseStamped, self.on_mavros_pose)
+
+
+    def on_pitch(self, msg):
+        with self.data_lock:
+            self.pitch_cmd = msg.data
+
+    def on_roll(self, msg):
+        with self.data_lock:
+            self.roll_cmd = msg.data
+            print("in roll" + str(msg.data))
+
+    def on_yaw(self, msg):
+        with self.data_lock:
+            self.yaw_cmd = msg.data
+
+    def on_thrust(self, msg):
+        with self.data_lock:
+            print("in thrust" + str(msg.data))
+            self.thrust_cmd = msg.data
+
+    def on_velocity_body(self, msg: TwistStamped):
+        omega = msg.twist.angular
+        with self.data_lock:
+            self.omega[:] = [omega.x, omega.y, omega.z]
+
+
+    def joystick_controller(self, thrust_cmd, roll_cmd, yaw_cmd, pitch_cmd):
+        thrust_ctrl = thrust_cmd
+        roll_ctrl = 0*roll_cmd
+        yaw_ctrl = yaw_cmd
+        pitch_ctrl = pitch_cmd
+        return thrust_ctrl, roll_ctrl, yaw_ctrl, pitch_ctrl
+
+    def run(self):
+        
+        rate = rospy.Rate(50.0)
+        while not rospy.is_shutdown():
+            print("run "+str(self.thrust_cmd))
+            msg_thrust_out = Float64()
+            msg_thrust_out.data = self.thrust_cmd
+            self.thrust_pub.publish(msg_thrust_out)
+
+            msg_roll_out = Float64()
+            msg_roll_out.data = self.roll_cmd
+            self.roll_pub.publish(msg_roll_out)
+            
+            msg_yaw_out = Float64()
+            msg_yaw_out.data = self.yaw_cmd
+            self.yaw_pub.publish(msg_yaw_out)
+
+            msg_pitch_out = Float64()
+            msg_pitch_out.data = self.pitch_cmd
+            self.pitch_pub.publish(msg_pitch_out)
+            
+            rate.sleep()
+
+def main():
+    node = JoystickControlNode("joystick_control")
+    node.run()
+
+
+if __name__ == "__main__":
+    main()

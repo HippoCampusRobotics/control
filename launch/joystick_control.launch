@@ -1,0 +1,5 @@
+<launch>
+    <node name="joystick_control" pkg="control" type="joystick_control_node" output="screen" />
+    <node name="joystick" pkg="control" type="joystick_node" output="screen" />
+    <node name="joy" pkg="joy" type="joy_node" />
+</launch>
