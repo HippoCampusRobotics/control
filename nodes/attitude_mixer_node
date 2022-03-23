@@ -16,7 +16,11 @@ class AttitudeMixerNode(Node):
         self.pitch_angle = 0.0
         self.yaw_angle = 0.0
         self.roll_angle = 0.0
-        self.thrust = 0.3
+        self.thrust = 0.0
+
+        self.pitch_rate = 0.0
+        self.yaw_rate = 0.0
+        self.roll_rate = 0.0
 
         if self.get_param("~use_external_controller"):
             topic_name = "attitude_controller/setpoint"
@@ -42,6 +46,19 @@ class AttitudeMixerNode(Node):
                                            Float64,
                                            self.on_thrust,
                                            queue_size=1)
+        
+        self.roll_rate_sub = rospy.Subscriber("roll_rate",
+                                               Float64,
+                                               self.on_roll_rate,
+                                               queue_size=1)
+        self.pitch_rate_sub = rospy.Subscriber("pitch_rate",
+                                                Float64,
+                                                self.on_pitch_rate,
+                                                queue_size=1)
+        self.yaw_rate_sub = rospy.Subscriber("yaw_rate",
+                                              Float64,
+                                              self.on_yaw_rate,
+                                              queue_size=1)
 
     def on_pitch_angle(self, msg):
         with self.data_lock:
@@ -58,6 +75,18 @@ class AttitudeMixerNode(Node):
     def on_thrust(self, msg):
         with self.data_lock:
             self.thrust = msg.data
+    
+    def on_pitch_rate(self, msg):
+        with self.data_lock:
+            self.pitch_rate = msg.data
+
+    def on_roll_rate(self, msg):
+        with self.data_lock:
+            self.roll_rate = msg.data
+
+    def on_yaw_rate(self, msg):
+        with self.data_lock:
+            self.yaw_rate = msg.data
 
     def run(self):
         rate = rospy.Rate(50.0)
@@ -68,8 +97,8 @@ class AttitudeMixerNode(Node):
     def publish_attitude_target(self):
         msg = AttitudeTarget()
         msg.header.stamp = rospy.Time.now()
-        msg.type_mask = (msg.IGNORE_PITCH_RATE | msg.IGNORE_ROLL_RATE
-                         | msg.IGNORE_YAW_RATE)
+        msg.type_mask = 0#(msg.IGNORE_PITCH_RATE | msg.IGNORE_ROLL_RATE
+                         #| msg.IGNORE_YAW_RATE)
         with self.data_lock:
             q = tf.transformations.quaternion_from_euler(
                 self.roll_angle, self.pitch_angle, self.yaw_angle)
@@ -77,7 +106,13 @@ class AttitudeMixerNode(Node):
             msg.orientation.y = q[1]
             msg.orientation.z = q[2]
             msg.orientation.w = q[3]
+
             msg.thrust = self.thrust
+            
+            msg.body_rate.x = self.roll_rate
+            msg.body_rate.y = self.pitch_rate
+            msg.body_rate.z = self.yaw_rate
+
         self.attitude_pub.publish(msg)
 
 
