@@ -19,6 +19,7 @@ generate_dynamic_reconfigure_options(
   cfg/PidControl.cfg
   cfg/CarrotControl.cfg
   cfg/Twister.cfg
+  cfg/PidJoystickControl.cfg
 )
 
 catkin_package()
