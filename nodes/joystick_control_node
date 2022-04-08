@@ -3,7 +3,8 @@ import threading
 import numpy
 import rospy
 from dynamic_reconfigure.server import Server
-# from hippocampus_msgs.msg import PathFollowerTarget
+from control.cfg import PidJoystickControlConfig 
+
 from hippocampus_msgs.msg import ActuatorControls
 from geometry_msgs.msg import PoseStamped, TwistStamped
 from hippocampus_common.node import Node
@@ -19,28 +20,32 @@ class JoystickControlNode(Node):
         super(JoystickControlNode, self).__init__(name)
         self.data_lock = threading.RLock()
 
+        # init control gains
+        self.p_roll = 0.0
+        self.i_roll = 0.0
+        self.d_roll = 0.0
+        
+        self.p_pitch = 0.0
+        self.i_pitch = 0.0
+        self.d_pitch = 0.0
+        self.d_yaw = 0.0
+
+        self.thrust_scaling = 0.0
+
+        self.dyn_server = Server(PidJoystickControlConfig, self.on_pid_dyn_reconfigure)
+
+
+
+        self.roll = 0.0
+        self.pitch = 0.0
+        self.yaw = 0.0
+
         self.roll_cmd = 0.0
         self.pitch_cmd = 0.0
         self.yaw_cmd = 0.0
         self.thrust_cmd = 0.0
 
-        self.omega = [0.0, 0.0, 0.0]
-
-        # self.target_pub = rospy.Publisher("~target",
-        #                                   PathFollowerTarget,
-        #                                   queue_size=30)
-
-        # if self.use_ground_truth:
-        #     self.ground_truth_sub = rospy.Subscriber("ground_truth/state",
-        #                                              Odometry,
-        #                                              self.on_local_pose,
-        #                                              queue_size=1)
-        # else:
-        #     self.local_pose_sub = rospy.Subscriber("mavros/local_position/pose",
-        #                                            PoseStamped,
-        #                                            self.on_local_pose,
-        #                                            queue_size=1)
-        
+        self.omega = [0.0, 0.0, 0.0]        
         
         self.thrust_pub = rospy.Publisher("thrust", Float64, queue_size=1)
         # self.roll_pub = rospy.Publisher("roll_angle", Float64, queue_size=1)
@@ -50,6 +55,10 @@ class JoystickControlNode(Node):
         self.roll_rate_pub = rospy.Publisher("roll_rate", Float64, queue_size=1)
         self.pitch_rate_pub = rospy.Publisher("pitch_rate", Float64, queue_size=1)
         self.yaw_rate_pub = rospy.Publisher("yaw_rate", Float64, queue_size=1)
+
+        self.debug_val1_pub = rospy.Publisher("debug_val1", Float64, queue_size=1)
+        self.debug_val2_pub = rospy.Publisher("debug_val2", Float64, queue_size=1)
+        self.debug_val3_pub = rospy.Publisher("debug_val3", Float64, queue_size=1)
 
         self.actuator_controls_pub = rospy.Publisher("actuator_controls_0",
                                                       ActuatorControls,
@@ -82,6 +91,25 @@ class JoystickControlNode(Node):
         self.attitude_sub = rospy.Subscriber("mavros/local_position/pose",
                                              PoseStamped, self.on_pose)
 
+    def on_pid_dyn_reconfigure(self, config, level):
+        # the config parameters are provided as dictionary. The keys are the
+        # parameter names we specified in cfg/PidControl.cfg
+        # use data_lock to avoid parallel modifications of the variables
+        # from different threads (here the main thread running the loop in the
+        # run() method and the thread runing the dynamic_reconfigure callback).
+        with self.data_lock:
+            self.p_roll = config["p_roll"]
+            self.i_roll = config["i_roll"]
+            self.d_roll = config["d_roll"]
+
+            self.p_pitch = config["p_pitch"]
+            self.i_pitch = config["i_pitch"]
+            self.d_pitch = config["d_pitch"]
+
+            self.d_yaw = config["d_yaw"]
+
+            self.thrust_scaling = config["thrust_scaling"]
+        return config
 
     def on_pitch(self, msg):
         with self.data_lock:
@@ -121,15 +149,29 @@ class JoystickControlNode(Node):
 
     def joystick_controller(self):
 
-        u_thrust = self.thrust_cmd
-        u_roll = self.roll_cmd
-        u_yaw = self.yaw_cmd
-        
+        u_thrust = self.thrust_scaling * self.thrust_cmd
 
-        p = 1
-        d = 1
-        pitch_des = 0
-        u_pitch = self.pitch_cmd # -p*(pitch_des-self.pitch) - d*(self.pitch_cmd-self.omega[1])
+        u_roll = self.p_roll * (self.roll_cmd-self.roll) + self.d_roll * (0-self.omega[0])
+        
+        u_pitch = self.p_pitch*(self.pitch_cmd-self.pitch) + self.d_pitch*(0-self.omega[1])
+
+        # Debug values
+        debug_val1 = (self.pitch_cmd-self.pitch)
+        debug_val2 = (0-self.omega[1])
+        debug_val3 = u_pitch
+        #
+        debug1_out = Float64()
+        debug1_out.data = debug_val1
+        self.debug_val1_pub.publish(debug1_out)
+        debug2_out = Float64()
+        debug2_out.data = debug_val2 
+        self.debug_val2_pub.publish(debug2_out)
+        debug3_out = Float64()
+        debug3_out.data = debug_val3
+        self.debug_val3_pub.publish(debug3_out)
+
+        u_yaw = self.d_yaw * (self.yaw_cmd-self.omega[2])
+
 
         u = [u_thrust, u_roll, u_pitch, u_yaw]
 

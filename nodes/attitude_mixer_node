@@ -97,8 +97,8 @@ class AttitudeMixerNode(Node):
     def publish_attitude_target(self):
         msg = AttitudeTarget()
         msg.header.stamp = rospy.Time.now()
-        msg.type_mask = 0#(msg.IGNORE_PITCH_RATE | msg.IGNORE_ROLL_RATE
-                         #| msg.IGNORE_YAW_RATE)
+        msg.type_mask = 0 #(msg.IGNORE_PITCH_RATE | msg.IGNORE_ROLL_RATE
+                          #| msg.IGNORE_YAW_RATE)
         with self.data_lock:
             q = tf.transformations.quaternion_from_euler(
                 self.roll_angle, self.pitch_angle, self.yaw_angle)
