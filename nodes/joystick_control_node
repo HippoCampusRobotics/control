@@ -1,4 +1,6 @@
+#!/usr/bin/env python
 import threading
+from xmlrpc.client import Boolean
 
 import numpy
 import rospy
@@ -8,6 +10,7 @@ from control.cfg import PidJoystickControlConfig
 from hippocampus_msgs.msg import ActuatorControls
 from geometry_msgs.msg import PoseStamped, TwistStamped
 from hippocampus_common.node import Node
+from mavros_msgs.srv import CommandLong, CommandBool
 from nav_msgs.msg import Odometry
 from std_msgs.msg import Float64
 
@@ -84,12 +87,25 @@ class JoystickControlNode(Node):
                                                Float64,
                                                self.on_roll,
                                                queue_size=1)
+        # dirty quick hack --> make ros-services from this
+        self.but_a_sub = rospy.Subscriber("but_a_joy", 
+                                               Float64,
+                                               self.on_but_a_joy,
+                                               queue_size=1)
+        self.but_b_sub = rospy.Subscriber("but_b_joy", 
+                                               Float64,
+                                               self.on_but_b_joy,
+                                               queue_size=1)
         
         self.velocity_sub = rospy.Subscriber("mavros/local_position/velocity_body", 
                                                 TwistStamped,
                                                 self.on_velocity_body)
         self.attitude_sub = rospy.Subscriber("mavros/local_position/pose",
                                              PoseStamped, self.on_pose)
+        
+        # set-up services for arming/disarming via joystick
+        self.namespaces = ["/uuv02","/bluerov"] #self.get_param("~namespaces")
+        self.services = self.init_services()
 
     def on_pid_dyn_reconfigure(self, config, level):
         # the config parameters are provided as dictionary. The keys are the
@@ -145,6 +161,23 @@ class JoystickControlNode(Node):
         omega = msg.twist.angular
         with self.data_lock:
             self.omega[:] = [omega.x, omega.y, omega.z]
+    
+    
+    def on_but_a_joy(self, msg):
+        button_a = msg.data
+        if button_a > 0:
+            self.call_arm()
+            return
+        else:
+            return
+    
+    def on_but_b_joy(self, msg):
+        button_b = msg.data
+        if button_b > 0:
+            self.call_disarm()
+            return
+        else:
+            return
 
 
     def joystick_controller(self):
@@ -170,12 +203,54 @@ class JoystickControlNode(Node):
         debug3_out.data = debug_val3
         self.debug_val3_pub.publish(debug3_out)
 
-        u_yaw = self.d_yaw * (self.yaw_cmd-self.omega[2])
+        #u_yaw = self.d_yaw * (self.yaw_cmd-self.omega[2])
+        u_yaw = self.d_yaw * self.yaw_cmd
 
 
         u = [u_thrust, u_roll, u_pitch, u_yaw]
 
         return u
+
+    def init_services(self):
+        s = dict()
+        s["arm"] = {
+            0:
+            rospy.ServiceProxy(
+                "{}/mavros/cmd/arming".format(self.namespaces[0]), CommandBool),
+            1:
+            rospy.ServiceProxy(
+                "{}/mavros/cmd/arming".format(self.namespaces[1]), CommandBool)
+        }
+        s["command_long"] = {
+            0:
+            #rospy.ServiceProxy(
+            #    "{}/mavros/cmd/command".format(self.namespaces[0]), CommandLong),
+            rospy.ServiceProxy("/uuv02/mavros/cmd/command", CommandLong),
+            1:
+            rospy.ServiceProxy(
+                "{}/mavros/cmd/command".format(self.namespaces[1]), CommandLong)
+        }
+        return s
+    
+    def call_disarm(self, index=0):
+        try:
+            self.services["command_long"][index](command=400, param1=0, param2=21196)
+            rospy.logwarn("Success to call disarm service.")                                     
+        except rospy.ServiceException:
+            rospy.logerr("Failed to call disarm service.")
+
+    def call_arm(self, index=0):
+        try:
+            #r = self.services["command_long"][index](command=400, param1=1, param2=21196)
+            #rospy.logwarn("Success to call arm service.")            
+            rospy.logwarn("Joystick Arming temporary disabled for safety reasons.")            
+        except rospy.ServiceException:
+            rospy.logerr("Failed to call arm service.")
+        #else:
+        #    rospy.logwarn(r)
+
+
+
 
     def run(self):
         

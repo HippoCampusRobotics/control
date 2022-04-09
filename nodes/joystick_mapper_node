@@ -9,8 +9,8 @@ class JoyMapperNode(Node):
     def __init__(self, name):
         super(JoyMapperNode, self).__init__(name)
 
-        rospy.logwarn("hello")
-        self.mapping = self.read_params()
+        #rospy.logwarn("hello")
+        self.axis_map, self.button_map = self.read_params()
 
         # self.vertical_thrust_pub = rospy.Publisher("vertical_thrust_input",
         #                                           Float64,
@@ -23,9 +23,13 @@ class JoyMapperNode(Node):
         self.pitch_pub = rospy.Publisher("pitch_joy", Float64, queue_size=1)
         self.yaw_pub = rospy.Publisher("yaw_joy", Float64, queue_size=1)
 
+        self.but_a_pub = rospy.Publisher("but_a_joy", Float64, queue_size=1)
+        self.but_b_pub = rospy.Publisher("but_b_joy", Float64, queue_size=1)
+
         rospy.Subscriber("joy", Joy, self.on_joy, queue_size=10)
 
     def read_params(self):
+        # http://wiki.ros.org/joy
         # left toggle 
         # <-> [0]
         # ^-v [1]
@@ -37,26 +41,35 @@ class JoyMapperNode(Node):
         # cross
         # <-> [6]
         # ^-v [7]
+        axis_mapping = {}
+        axis_mapping["thrust"] = 1 #self.get_param("~thrust_axis", 1)
+        axis_mapping["roll"] = 0 #self.get_param("~roll_axis", 0)       
+        axis_mapping["yaw"] = 3 #self.get_param("~yaw_axis", 3)
+        axis_mapping["pitch"] = 4 #self.get_param("~pitch_axis", 4)
 
 
-        mapping = {}
-        mapping["thrust"] = self.get_param("~thrust_axis", 1)
-        mapping["roll"] = self.get_param("~roll_axis", 0)
+        button_mapping = {}
+        button_mapping["a"] = 0 #self.get_param("~a_button", 0)
+        button_mapping["b"] = 1 #self.get_param("~b_button", 1)
         
-        mapping["yaw"] = self.get_param("~yaw_axis", 3)
-        mapping["pitch"] = self.get_param("~pitch_axis", 4)
-        
-        return mapping
+        return axis_mapping, button_mapping
 
     def on_joy(self, msg):
-        for axis in self.mapping:
+        for axis in self.axis_map:
             msg_out = Float64()
-            pub = self.get_pub(axis)
-            index = self.mapping[axis]
+            pub = self.get_axis_pub(axis)
+            index = self.axis_map[axis]
             msg_out.data = msg.axes[index]
             pub.publish(msg_out)
+        
+        for button in self.button_map:
+            msg_out = Float64()
+            pub = self.get_button_pub(button)
+            index = self.button_map[button]
+            msg_out.data = msg.buttons[index]
+            pub.publish(msg_out)
 
-    def get_pub(self, axis):
+    def get_axis_pub(self, axis):
         if axis == "thrust":
             return self.thrust_pub
         elif axis == "roll":
@@ -65,6 +78,17 @@ class JoyMapperNode(Node):
             return self.pitch_pub
         elif axis == "yaw":
             return self.yaw_pub
+        else:
+            return None
+    def get_button_pub(self, button):
+        if button == "a":
+            return self.but_a_pub
+        elif button == "b":
+            return self.but_b_pub
+        # elif button == "x":
+        #     return self.pitch_pub
+        # elif button == "y":
+        #     return self.yaw_pub
         else:
             return None
 
