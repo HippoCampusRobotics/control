@@ -42,5 +42,6 @@ catkin_install_python(PROGRAMS
   nodes/twister_node
   nodes/joystick_mapper_node
   nodes/joystick_control_node
+  nodes/depth_estimator_node
   DESTINATION ${CATKIN_PACKAGE_BIN_DESTINATION}
 )

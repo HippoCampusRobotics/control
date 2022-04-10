@@ -25,7 +25,10 @@ class JoyMapperNode(Node):
 
         self.but_a_pub = rospy.Publisher("but_a_joy", Float64, queue_size=1)
         self.but_b_pub = rospy.Publisher("but_b_joy", Float64, queue_size=1)
+        self.but_x_pub = rospy.Publisher("but_x_joy", Float64, queue_size=1)
+        self.but_y_pub = rospy.Publisher("but_y_joy", Float64, queue_size=1)
 
+        
         rospy.Subscriber("joy", Joy, self.on_joy, queue_size=10)
 
     def read_params(self):
@@ -51,6 +54,8 @@ class JoyMapperNode(Node):
         button_mapping = {}
         button_mapping["a"] = 0 #self.get_param("~a_button", 0)
         button_mapping["b"] = 1 #self.get_param("~b_button", 1)
+        button_mapping["x"] = 2
+        button_mapping["y"] = 3
         
         return axis_mapping, button_mapping
 
@@ -85,10 +90,10 @@ class JoyMapperNode(Node):
             return self.but_a_pub
         elif button == "b":
             return self.but_b_pub
-        # elif button == "x":
-        #     return self.pitch_pub
-        # elif button == "y":
-        #     return self.yaw_pub
+        elif button == "x":
+            return self.but_x_pub
+        elif button == "y":
+            return self.but_y_pub
         else:
             return None
 
