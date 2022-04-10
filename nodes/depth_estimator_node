@@ -1,0 +1,129 @@
+#!/usr/bin/env python
+
+import rospy
+import numpy as np
+from sensor_msgs.msg import FluidPressure
+from hippocampus_msgs.msg import DepthEKFStamped
+
+
+class KalmanFilter(object):
+    def __init__(self, x0, p0, v, w):
+        self.dim_state = 2
+        self._x_est_0 = x0
+        self._x_est = self._x_est_0
+        self._p0_mat = p0
+        self._p_mat = self._p0_mat
+        self._v_mat = v
+        self._w_mat = w
+        self._h_mat = np.array([-1.0e4, 0.0]).reshape((1, -1))
+
+    def h_fun(self, depth):
+        return -depth * 1.0e4 + 101300
+
+    def get_x_est(self):
+        return np.copy(self._x_est)
+
+    def get_x_est_0(self):
+        return np.copy(self._x_est_0)
+
+    def get_p_mat(self):
+        return np.copy(self._p_mat)
+
+    def get_p_mat_0(self):
+        return np.copy(self._p0_mat)
+
+    def reset(self, x_est_0=None, p0_mat=None):
+        if x_est_0:
+            self._x_est = x_est_0
+            self._x_est_0 = x_est_0
+        else:
+            self._x_est = self._x_est_0
+        if p0_mat:
+            self._p = p0_mat
+            self._p0 = p0_mat
+        else:
+            self._p = self._p0_mat
+
+    def predict(self, dt):
+        a_mat = np.array([[1, dt], [0, 1]])
+        self._x_est = np.matmul(a_mat, self._x_est)
+        self._p_mat = np.matmul(np.matmul(a_mat, self._p_mat),
+                                a_mat.transpose()) + self._v_mat
+
+    def update(self, z):
+        # estimated pressure measurement
+        z_est = self.h_fun(self._x_est[0, 0])
+        # innovation
+        y = np.asarray(z - z_est).reshape((-1, 1))
+
+        # compute K gain
+        tmp = np.matmul(np.matmul(self._h_mat, self._p_mat),
+                        self._h_mat.transpose()) + self._w_mat
+        k_mat = np.matmul(np.matmul(self._p_mat, self._h_mat.transpose()),
+                          np.linalg.inv(tmp))
+
+        # update state
+        self._x_est = self._x_est + np.matmul(k_mat, y)
+
+        # update covariance
+        p_tmp = np.eye(self.dim_state) - np.matmul(k_mat, self._h_mat)
+        self._p_mat = np.matmul(p_tmp, self._p_mat)
+
+
+class DepthEstimatorNode(object):
+    def __init__(self, node_name):
+
+        rospy.init_node(node_name)
+        sig_depth = float(rospy.get_param('~sig_depth'))
+        sig_vel_depth = float(rospy.get_param('~sig_vel_depth'))
+        sig_pressure = float(rospy.get_param('~sig_pressure'))
+
+        x_0 = np.array([0.0, 0.0]).reshape((-1, 1))
+        p_mat_0 = np.array(np.diag([0.1, 0.1]))
+        # process noise variance
+        v = np.array(np.diag([sig_depth**2, sig_vel_depth**2]))
+        # measurement noise variance
+        w = np.array([sig_pressure**2]).reshape((-1, 1))
+
+        # initialize KF
+        self.kf = KalmanFilter(x_0, p_mat_0, v, w)
+        self.t_last_prediction = rospy.get_time()
+        self.depth_pub = rospy.Publisher("depth", DepthEKFStamped, queue_size=1)
+
+        rospy.Subscriber("pressure",
+                         FluidPressure,
+                         self.pressure_callback,
+                         queue_size=1)
+
+        rospy.loginfo("[{}] Initialized KF.".format(rospy.get_name()))
+
+    def pressure_callback(self, pressure_msg):
+        pressure = pressure_msg.fluid_pressure
+
+        # prediction step of KF
+        now = rospy.get_time()
+        self.kf.predict(now - self.t_last_prediction)
+        self.t_last_prediction = now
+        self.kf.update(pressure)
+
+        # publish depth
+        self._publish_depth(self.kf.get_x_est())
+
+    def _publish_depth(self, depth):
+        depth_msg = DepthEKFStamped()
+        depth_msg.header.stamp = rospy.Time.now()
+        depth_msg.depth = self.kf.get_x_est()[0, 0]
+        depth_msg.z_vel = self.kf.get_x_est()[1, 0]
+        depth_msg.depth_covariance = self.kf.get_p_mat()[0, 0]
+        depth_msg.vel_covariance = self.kf.get_p_mat()[1, 1]
+        self.depth_pub.publish(depth_msg)
+
+
+def main():
+    node = DepthEstimatorNode("depth_estimator")
+    while not rospy.is_shutdown():
+        rospy.spin()
+
+
+if __name__ == "__main__":
+    main()

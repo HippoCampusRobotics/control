@@ -1,0 +1,4 @@
+# for simulation
+sig_depth: 0.001
+sig_vel_depth: 0.01
+sig_pressure: 100  # Unit: Pascal

@@ -6,6 +6,8 @@
     
     <group ns="$(arg vehicle_name)">
         <include file="$(find control)/launch/joystick_control.launch" pass_all_args="true"/>
+        <include file="$(find control)/launch/depth_estimator.launch" pass_all_args="true"/>
+
     </group>
 
 </launch>
