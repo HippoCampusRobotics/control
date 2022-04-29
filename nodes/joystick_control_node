@@ -13,6 +13,7 @@ from hippocampus_common.node import Node
 from mavros_msgs.srv import CommandLong, CommandBool
 from nav_msgs.msg import Odometry
 from std_msgs.msg import Float64
+from sensor_msgs.msg import Imu
 
 
 import tf.transformations
@@ -94,14 +95,6 @@ class JoystickControlNode(Node):
                                                self.on_roll,
                                                queue_size=1)
         # dirty quick hack --> switch ros-services for buttons
-        self.but_a_sub = rospy.Subscriber("but_a_joy", 
-                                               Float64,
-                                               self.on_but_a_joy,
-                                               queue_size=1)
-        self.but_b_sub = rospy.Subscriber("but_b_joy", 
-                                               Float64,
-                                               self.on_but_b_joy,
-                                               queue_size=1)
         self.but_x_sub = rospy.Subscriber("but_x_joy", 
                                                Float64,
                                                self.on_but_x_joy,
@@ -110,19 +103,19 @@ class JoystickControlNode(Node):
                                                Float64,
                                                self.on_but_y_joy,
                                                queue_size=1)
-        self.velocity_sub = rospy.Subscriber("mavros/local_position/velocity_body", 
-                                                TwistStamped,
-                                                self.on_velocity_body)
-        self.attitude_sub = rospy.Subscriber("mavros/local_position/pose",
-                                             PoseStamped, self.on_pose)
+        #self.velocity_sub = rospy.Subscriber("mavros/local_position/velocity_body", 
+        #                                        TwistStamped,
+        #                                        self.on_velocity_body)
+        #self.attitude_sub = rospy.Subscriber("mavros/local_position/pose",
+        #                                     PoseStamped, self.on_pose)
+
+        self.attitude_sub = rospy.Subscriber("mavros/imu/data",
+                                             Imu, self.on_pose)
+
 
         self.depth_sub = rospy.Subscriber("depth",
                                         DepthEKFStamped, 
                                         self.on_depth)
-        
-        # set-up services for arming/disarming via joystick
-        self.namespaces = ["/uuv02","/bluerov"] #self.get_param("~namespaces")
-        self.services = self.init_services()
 
     def on_pid_dyn_reconfigure(self, config, level):
         # the config parameters are provided as dictionary. The keys are the
@@ -162,7 +155,7 @@ class JoystickControlNode(Node):
             self.thrust_cmd = msg.data
 
     def on_pose(self, msg):
-        q = msg.pose.orientation
+        q = msg.orientation
         pose = tf.transformations.euler_from_quaternion([q.x, q.y, q.z, q.w])
         self.pitch = pose[1]
         self.roll = pose[0]
@@ -186,22 +179,6 @@ class JoystickControlNode(Node):
         with self.data_lock:
             self.omega[:] = [omega.x, omega.y, omega.z]
     
-    
-    def on_but_a_joy(self, msg):
-        button_a = msg.data
-        if button_a > 0:
-            self.call_arm()
-            return
-        else:
-            return
-    
-    def on_but_b_joy(self, msg):
-        button_b = msg.data
-        if button_b > 0:
-            self.call_disarm()
-            return
-        else:
-            return
     
     def on_but_x_joy(self, msg):
         button_x = msg.data
@@ -265,42 +242,7 @@ class JoystickControlNode(Node):
 
         return u
 
-    def init_services(self):
-        s = dict()
-        s["arm"] = {
-            0:
-            rospy.ServiceProxy(
-                "{}/mavros/cmd/arming".format(self.namespaces[0]), CommandBool),
-            1:
-            rospy.ServiceProxy(
-                "{}/mavros/cmd/arming".format(self.namespaces[1]), CommandBool)
-        }
-        s["command_long"] = {
-            0:
-            rospy.ServiceProxy("{}/mavros/cmd/command".format(self.namespaces[0]), CommandLong),
-            #rospy.ServiceProxy("/uuv02/mavros/cmd/command", CommandLong),
-            1:
-            rospy.ServiceProxy(
-                "{}/mavros/cmd/command".format(self.namespaces[1]), CommandLong)
-        }
-        return s
-    
-    def call_disarm(self, index=0):
-        try:
-            self.services["command_long"][index](command=400, param1=0, param2=21196)
-            rospy.logwarn("Success to call disarm service.")                                     
-        except rospy.ServiceException:
-            rospy.logerr("Failed to call disarm service.")
 
-    def call_arm(self, index=0):
-        try:
-            #r = self.services["command_long"][index](command=400, param1=1, param2=21196)
-            #rospy.logwarn("Success to call arm service.")            
-            rospy.logwarn("Joystick Arming temporary disabled for safety reasons.")            
-        except rospy.ServiceException:
-            rospy.logerr("Failed to call arm service.")
-        #else:
-        #    rospy.logwarn(r)
 
 
 

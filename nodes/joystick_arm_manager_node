@@ -1,0 +1,147 @@
+#!/usr/bin/env python
+import threading
+from xmlrpc.client import Boolean
+from std_msgs.msg import Float64
+
+import numpy
+import rospy
+
+
+from hippocampus_common.node import Node
+from mavros_msgs.srv import CommandLong, CommandBool
+
+class JoystickArmManagerNode(Node):
+    def __init__(self, name):
+        super(JoystickArmManagerNode, self).__init__(name)
+        self.data_lock = threading.RLock()
+
+        self.but_a_sub = rospy.Subscriber("but_a_joy", 
+                                               Float64,
+                                               self.on_but_a_joy,
+                                               queue_size=1)
+        self.but_b_sub = rospy.Subscriber("but_b_joy", 
+                                               Float64,
+                                               self.on_but_b_joy,
+                                               queue_size=1)
+
+        self.but_start_sub = rospy.Subscriber("but_start_joy", 
+                                               Float64,
+                                               self.on_but_start_joy,
+                                               queue_size=1)
+
+        
+
+        self.button_a = 0
+        self.button_b = 0
+        self.button_start = 0
+        self.arming_started = False
+        self.time_counter = 0
+        
+        # set-up services for arming/disarming via joystick
+        #self.namespaces = self.get_param("~namespaces")
+        self.namespaces = ["/"+rospy.get_param("~vehicle_name"),"/uuv02","/bluerov"]
+        rospy.logwarn("name = " + self.namespaces[0])
+        self.services = self.init_services()
+
+
+    def on_but_a_joy(self, msg):
+        self.button_a = msg.data
+        # if self.button_a > 0:
+        #     self.call_arm()
+        #     return
+        # else:
+        #     return
+    
+    def on_but_b_joy(self, msg):
+        self.button_b = msg.data
+        if self.button_b > 0:
+            self.call_disarm()
+            return
+        else:
+            return
+    
+    def on_but_start_joy(self, msg):
+        self.button_start = msg.data
+        if self.button_start > 0:
+            #self.call_arm()
+            return
+        else:
+            return
+
+    def init_services(self):
+        s = dict()
+        s["arm"] = {
+            0:
+            rospy.ServiceProxy(
+                "{}/mavros/cmd/arming".format(self.namespaces[0]), CommandBool),
+            1:
+            rospy.ServiceProxy(
+                "{}/mavros/cmd/arming".format(self.namespaces[1]), CommandBool)
+        }
+        s["command_long"] = {
+            0:
+            #rospy.ServiceProxy("{}/mavros/cmd/command".format(self.namespaces[0]), CommandLong),
+            
+            #rospy.ServiceProxy("{}/mavros/cmd/command".format(self.namespaces[0]), CommandLong),
+            
+            rospy.ServiceProxy("/uuv00/mavros/cmd/command", CommandLong),
+            1:
+            rospy.ServiceProxy(
+                "{}/mavros/cmd/command".format(self.namespaces[1]), CommandLong)
+        }
+        return s
+    
+    def arming_sequence(self):
+        if not self.arming_started and (self.button_a>0 or self.button_start>0):
+            rospy.loginfo("ARMING: keep pressing A and START for 1s")
+
+        if self.button_a>0 and self.button_start>0:
+                        
+            if self.arming_started:
+                buttons_pressed_time = rospy.get_time() - self.time_counter
+                if  buttons_pressed_time > 1.0:
+                    self.call_arm()
+                    self.arming_started = False
+
+            else:
+                self.time_counter = rospy.get_time()
+                self.arming_started = True
+                #rospy.logwarn("counter started")
+
+        else:
+            self.arming_started = False
+        
+
+
+    def call_disarm(self, index=0):
+        try:
+            self.services["command_long"][index](command=400, param1=0, param2=21196)
+            rospy.logwarn("Success to call disarm service.")                                     
+        except rospy.ServiceException:
+            rospy.logerr("Failed to call disarm service.")
+
+    def call_arm(self, index=0):
+        try:
+            r = self.services["command_long"][index](command=400, param1=1, param2=21196)
+            rospy.logwarn("Success to call arm service.")            
+            #rospy.logwarn("Joystick Arming temporary disabled for safety reasons.")            
+        except rospy.ServiceException:
+            rospy.logerr("Failed to call arm service.")
+        #else:
+        #    rospy.logwarn(r)
+
+    
+    def run(self):
+        
+        rate = rospy.Rate(10.0)
+        while not rospy.is_shutdown():
+            self.arming_sequence()
+            rate.sleep()
+
+def main():
+    node = JoystickArmManagerNode("joystick_arming")
+    node.run()
+
+
+if __name__ == "__main__":
+    main()

@@ -28,6 +28,9 @@ class JoyMapperNode(Node):
         self.but_x_pub = rospy.Publisher("but_x_joy", Float64, queue_size=1)
         self.but_y_pub = rospy.Publisher("but_y_joy", Float64, queue_size=1)
 
+        self.but_start_pub = rospy.Publisher("but_start_joy", Float64, queue_size=1)
+        self.but_back_pub = rospy.Publisher("but_back_joy", Float64, queue_size=1)
+
         
         rospy.Subscriber("joy", Joy, self.on_joy, queue_size=10)
 
@@ -45,17 +48,29 @@ class JoyMapperNode(Node):
         # <-> [6]
         # ^-v [7]
         axis_mapping = {}
+        axis_mapping["roll"] = 0 
         axis_mapping["thrust"] = 1 #self.get_param("~thrust_axis", 1)
-        axis_mapping["roll"] = 0 #self.get_param("~roll_axis", 0)       
+        #axis_mapping["LT"] = 2 # default 1.0
+        
         axis_mapping["yaw"] = 3 #self.get_param("~yaw_axis", 3)
         axis_mapping["pitch"] = 4 #self.get_param("~pitch_axis", 4)
+        #axis_mapping["RT"] = 5 # default 1.0
 
+        #axis_mapping["cross_h"] = 6 # 1.0<-- 0 -->-1.0
+        #axis_mapping["cross_v"] = 7 # 1.0^-- 0 --v-1.0
 
         button_mapping = {}
         button_mapping["a"] = 0 #self.get_param("~a_button", 0)
         button_mapping["b"] = 1 #self.get_param("~b_button", 1)
         button_mapping["x"] = 2
         button_mapping["y"] = 3
+        #button_mapping["LB"] = 4
+        #button_mapping["RB"] = 5
+        button_mapping["back"] = 6
+        button_mapping["start"] = 7
+        #button_mapping["logi"] = 8
+        #button_mapping["l_stick"] = 9
+        #button_mapping["r_stick"] = 10
         
         return axis_mapping, button_mapping
 
@@ -94,6 +109,10 @@ class JoyMapperNode(Node):
             return self.but_x_pub
         elif button == "y":
             return self.but_y_pub
+        elif button == "start":
+            return self.but_start_pub
+        elif button == "back":
+            return self.but_back_pub
         else:
             return None
 
