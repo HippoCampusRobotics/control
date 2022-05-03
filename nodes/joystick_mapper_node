@@ -28,6 +28,9 @@ class JoyMapperNode(Node):
         self.but_x_pub = rospy.Publisher("but_x_joy", Float64, queue_size=1)
         self.but_y_pub = rospy.Publisher("but_y_joy", Float64, queue_size=1)
 
+        self.but_lb_pub = rospy.Publisher("but_lb_joy", Float64, queue_size=1)
+        self.but_rb_pub = rospy.Publisher("but_rb_joy", Float64, queue_size=1)
+
         self.but_start_pub = rospy.Publisher("but_start_joy", Float64, queue_size=1)
         self.but_back_pub = rospy.Publisher("but_back_joy", Float64, queue_size=1)
 
@@ -64,8 +67,8 @@ class JoyMapperNode(Node):
         button_mapping["b"] = 1 #self.get_param("~b_button", 1)
         button_mapping["x"] = 2
         button_mapping["y"] = 3
-        #button_mapping["LB"] = 4
-        #button_mapping["RB"] = 5
+        button_mapping["LB"] = 4
+        button_mapping["RB"] = 5
         button_mapping["back"] = 6
         button_mapping["start"] = 7
         #button_mapping["logi"] = 8
@@ -109,6 +112,10 @@ class JoyMapperNode(Node):
             return self.but_x_pub
         elif button == "y":
             return self.but_y_pub
+        elif button == "LB":
+            return self.but_lb_pub
+        elif button == "RB":
+            return self.but_rb_pub
         elif button == "start":
             return self.but_start_pub
         elif button == "back":
