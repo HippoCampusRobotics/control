@@ -1,0 +1,133 @@
+#!/usr/bin/env python
+import rospy
+from sensor_msgs.msg import Joy
+from std_msgs.msg import Float64
+from hippocampus_common.node import Node
+
+
+class JoyMapperNode(Node):
+    def __init__(self, name):
+        super(JoyMapperNode, self).__init__(name)
+
+        #rospy.logwarn("hello")
+        self.axis_map, self.button_map = self.read_params()
+
+        # self.vertical_thrust_pub = rospy.Publisher("vertical_thrust_input",
+        #                                           Float64,
+        #                                           queue_size=1)
+        # self.lateral_thrust_pub = rospy.Publisher("lateral_thrust",
+        #                                          Float64,
+        #                                          queue_size=1)
+        self.thrust_pub = rospy.Publisher("thrust_joy", Float64, queue_size=1)
+        self.roll_pub = rospy.Publisher("roll_joy", Float64, queue_size=1)
+        self.pitch_pub = rospy.Publisher("pitch_joy", Float64, queue_size=1)
+        self.yaw_pub = rospy.Publisher("yaw_joy", Float64, queue_size=1)
+
+        self.but_a_pub = rospy.Publisher("but_a_joy", Float64, queue_size=1)
+        self.but_b_pub = rospy.Publisher("but_b_joy", Float64, queue_size=1)
+        self.but_x_pub = rospy.Publisher("but_x_joy", Float64, queue_size=1)
+        self.but_y_pub = rospy.Publisher("but_y_joy", Float64, queue_size=1)
+
+        self.but_lb_pub = rospy.Publisher("but_lb_joy", Float64, queue_size=1)
+        self.but_rb_pub = rospy.Publisher("but_rb_joy", Float64, queue_size=1)
+
+        self.but_start_pub = rospy.Publisher("but_start_joy", Float64, queue_size=1)
+        self.but_back_pub = rospy.Publisher("but_back_joy", Float64, queue_size=1)
+
+        
+        rospy.Subscriber("joy", Joy, self.on_joy, queue_size=10)
+
+    def read_params(self):
+        # http://wiki.ros.org/joy
+        # left toggle 
+        # <-> [0]
+        # ^-v [1]
+        # shoulder left [2] 
+        # right toggle
+        # <-> [3]
+        # ^-v [4]
+        # shoulder left [5] 
+        # cross
+        # <-> [6]
+        # ^-v [7]
+        axis_mapping = {}
+        axis_mapping["roll"] = 0 
+        axis_mapping["thrust"] = 1 #self.get_param("~thrust_axis", 1)
+        #axis_mapping["LT"] = 2 # default 1.0
+        
+        axis_mapping["yaw"] = 3 #self.get_param("~yaw_axis", 3)
+        axis_mapping["pitch"] = 4 #self.get_param("~pitch_axis", 4)
+        #axis_mapping["RT"] = 5 # default 1.0
+
+        #axis_mapping["cross_h"] = 6 # 1.0<-- 0 -->-1.0
+        #axis_mapping["cross_v"] = 7 # 1.0^-- 0 --v-1.0
+
+        button_mapping = {}
+        button_mapping["a"] = 0 #self.get_param("~a_button", 0)
+        button_mapping["b"] = 1 #self.get_param("~b_button", 1)
+        button_mapping["x"] = 2
+        button_mapping["y"] = 3
+        button_mapping["LB"] = 4
+        button_mapping["RB"] = 5
+        button_mapping["back"] = 6
+        button_mapping["start"] = 7
+        #button_mapping["logi"] = 8
+        #button_mapping["l_stick"] = 9
+        #button_mapping["r_stick"] = 10
+        
+        return axis_mapping, button_mapping
+
+    def on_joy(self, msg):
+        for axis in self.axis_map:
+            msg_out = Float64()
+            pub = self.get_axis_pub(axis)
+            index = self.axis_map[axis]
+            msg_out.data = msg.axes[index]
+            pub.publish(msg_out)
+        
+        for button in self.button_map:
+            msg_out = Float64()
+            pub = self.get_button_pub(button)
+            index = self.button_map[button]
+            msg_out.data = msg.buttons[index]
+            pub.publish(msg_out)
+
+    def get_axis_pub(self, axis):
+        if axis == "thrust":
+            return self.thrust_pub
+        elif axis == "roll":
+            return self.roll_pub
+        elif axis == "pitch":
+            return self.pitch_pub
+        elif axis == "yaw":
+            return self.yaw_pub
+        else:
+            return None
+    def get_button_pub(self, button):
+        if button == "a":
+            return self.but_a_pub
+        elif button == "b":
+            return self.but_b_pub
+        elif button == "x":
+            return self.but_x_pub
+        elif button == "y":
+            return self.but_y_pub
+        elif button == "LB":
+            return self.but_lb_pub
+        elif button == "RB":
+            return self.but_rb_pub
+        elif button == "start":
+            return self.but_start_pub
+        elif button == "back":
+            return self.but_back_pub
+        else:
+            return None
+
+
+def main():
+    node = JoyMapperNode("joystick_mapper")
+    node.run()
+
+
+if __name__ == "__main__":
+    main()

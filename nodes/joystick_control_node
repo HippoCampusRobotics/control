@@ -1,0 +1,294 @@
+#!/usr/bin/env python
+import threading
+from xmlrpc.client import Boolean
+
+import numpy
+import rospy
+from dynamic_reconfigure.server import Server
+from control.cfg import PidJoystickControlConfig 
+
+from hippocampus_msgs.msg import ActuatorControls, DepthEKFStamped
+from geometry_msgs.msg import PoseStamped, TwistStamped
+from hippocampus_common.node import Node
+from mavros_msgs.srv import CommandLong, CommandBool
+from nav_msgs.msg import Odometry
+from std_msgs.msg import Float64
+from sensor_msgs.msg import Imu
+
+
+import tf.transformations
+
+#from control.cfg import CarrotControlConfig
+
+class JoystickControlNode(Node):
+    def __init__(self, name):
+        super(JoystickControlNode, self).__init__(name)
+        self.data_lock = threading.RLock()
+
+        # init control gains
+        self.p_roll = 0.0
+        self.i_roll = 0.0
+        self.d_roll = 0.0
+        
+        self.p_pitch = 0.0
+        self.i_pitch = 0.0
+        self.d_pitch = 0.0
+        
+        self.l_depth = 0.5
+        self.yaw_scaling = 0.0
+
+        self.thrust_scaling = 0.0
+
+        self.dyn_server = Server(PidJoystickControlConfig, self.on_pid_dyn_reconfigure)
+
+        self.stay_on_depth = False
+
+        self.roll = 0.0
+        self.pitch = 0.0
+        self.yaw = 0.0
+
+        self.depth = 0.0
+        self.depth_vel = 0.0
+
+        self.roll_cmd = 0.0
+        self.pitch_cmd = 0.0
+        self.yaw_cmd = 0.0
+        self.thrust_cmd = 0.0
+
+        self.omega = [0.0, 0.0, 0.0]        
+        
+        self.thrust_pub = rospy.Publisher("thrust", Float64, queue_size=1)
+        # self.roll_pub = rospy.Publisher("roll_angle", Float64, queue_size=1)
+        # self.pitch_pub = rospy.Publisher("pitch_angle", Float64, queue_size=1)
+        # self.yaw_pub = rospy.Publisher("yaw_angle", Float64, queue_size=1)
+
+        self.roll_rate_pub = rospy.Publisher("roll_rate", Float64, queue_size=1)
+        self.pitch_rate_pub = rospy.Publisher("pitch_rate", Float64, queue_size=1)
+        self.yaw_rate_pub = rospy.Publisher("yaw_rate", Float64, queue_size=1)
+
+        self.debug_val1_pub = rospy.Publisher("debug_val1", Float64, queue_size=1)
+        self.debug_val2_pub = rospy.Publisher("debug_val2", Float64, queue_size=1)
+        self.debug_val3_pub = rospy.Publisher("debug_val3", Float64, queue_size=1)
+
+        self.actuator_controls_pub = rospy.Publisher("actuator_controls_0",
+                                                      ActuatorControls,
+                                                      queue_size=1)
+
+
+        self.thrust_cmd_sub = rospy.Subscriber("thrust_joy", 
+                                               Float64,
+                                               self.on_thrust,
+                                               queue_size=1)
+        
+        self.yaw_cmd_sub = rospy.Subscriber("yaw_joy", 
+                                               Float64,
+                                               self.on_yaw,
+                                               queue_size=1)
+
+        self.pitch_cmd_sub = rospy.Subscriber("pitch_joy", 
+                                               Float64,
+                                               self.on_pitch,
+                                               queue_size=1)
+        
+        self.roll_cmd_sub = rospy.Subscriber("roll_joy", 
+                                               Float64,
+                                               self.on_roll,
+                                               queue_size=1)
+        # dirty quick hack --> switch ros-services for buttons
+        self.but_x_sub = rospy.Subscriber("but_x_joy", 
+                                               Float64,
+                                               self.on_but_x_joy,
+                                               queue_size=1)
+        self.but_y_sub = rospy.Subscriber("but_y_joy", 
+                                               Float64,
+                                               self.on_but_y_joy,
+                                               queue_size=1)
+        #self.velocity_sub = rospy.Subscriber("mavros/local_position/velocity_body", 
+        #                                        TwistStamped,
+        #                                        self.on_velocity_body)
+        #self.attitude_sub = rospy.Subscriber("mavros/local_position/pose",
+        #                                     PoseStamped, self.on_pose)
+
+        self.attitude_sub = rospy.Subscriber("mavros/imu/data",
+                                             Imu, self.on_pose)
+
+
+        self.depth_sub = rospy.Subscriber("depth",
+                                        DepthEKFStamped, 
+                                        self.on_depth)
+
+    def on_pid_dyn_reconfigure(self, config, level):
+        # the config parameters are provided as dictionary. The keys are the
+        # parameter names we specified in cfg/PidControl.cfg
+        # use data_lock to avoid parallel modifications of the variables
+        # from different threads (here the main thread running the loop in the
+        # run() method and the thread runing the dynamic_reconfigure callback).
+        with self.data_lock:
+            self.p_roll = config["p_roll"]
+            self.i_roll = config["i_roll"]
+            self.d_roll = config["d_roll"]
+
+            self.p_pitch = config["p_pitch"]
+            self.i_pitch = config["i_pitch"]
+            self.d_pitch = config["d_pitch"]
+
+            self.l_depth = config["l_depth"]
+
+            self.yaw_scaling = config["yaw_scaling"]
+
+            self.thrust_scaling = config["thrust_scaling"]
+        return config
+
+    def on_pitch(self, msg):
+        with self.data_lock:
+            self.pitch_cmd = msg.data
+
+    def on_roll(self, msg):
+        with self.data_lock:
+            self.roll_cmd = msg.data
+    def on_yaw(self, msg):
+        with self.data_lock:
+            self.yaw_cmd = msg.data
+
+    def on_thrust(self, msg):
+        with self.data_lock:
+            self.thrust_cmd = msg.data
+
+    def on_pose(self, msg):
+        q = msg.orientation
+        pose = tf.transformations.euler_from_quaternion([q.x, q.y, q.z, q.w])
+        self.pitch = pose[1]
+        self.roll = pose[0]
+        self.yaw = pose[2]
+
+        # e = self.setpoint - pitch
+        # with self.data_lock:
+        #     u = self.update_controller(
+        #         error=e, now=rospy.get_time())
+
+        # msg = Float64(u)
+        # self.pitch_pub.publish(msg)
+    
+    def on_depth(self, msg):
+        self.depth = msg.depth
+        self.depth_vel = msg.z_vel
+
+
+    def on_velocity_body(self, msg: TwistStamped):
+        omega = msg.twist.angular
+        with self.data_lock:
+            self.omega[:] = [omega.x, omega.y, omega.z]
+    
+    
+    def on_but_x_joy(self, msg):
+        button_x = msg.data
+        if button_x > 0:
+            self.stay_on_depth = True
+            self.set_current_depth()
+            rospy.loginfo("Depth Control enabled. Stay on %.2fm", self.depth_des)        
+            return
+        
+
+    def on_but_y_joy(self,msg):
+        button_y = msg.data
+        if button_y > 0:
+            rospy.loginfo("Depth Control disabled.")        
+            self.stay_on_depth = False
+            
+            return
+
+    def set_current_depth(self):
+        self.depth_des = self.depth
+
+    def depth_assist_control(self):
+        pitch_des = -(self.depth_des - self.depth)/self.l_depth
+        u_pitch = self.p_pitch*(pitch_des-self.pitch) + self.d_pitch*(0-self.omega[1])
+        return u_pitch
+
+    def joystick_controller(self):
+        
+        u_pitch = 0.0
+        if self.stay_on_depth:
+            u_pitch = self.depth_assist_control()
+        else:
+            u_pitch = self.p_pitch*(self.pitch_cmd-self.pitch) + self.d_pitch*(0-self.omega[1])
+
+        u_thrust = self.thrust_scaling * self.thrust_cmd
+
+        u_roll = self.p_roll * (self.roll_cmd-self.roll) + self.d_roll * (0-self.omega[0])
+        
+        
+
+        # Debug values
+        debug_val1 = (self.roll_cmd-self.roll)
+        debug_val2 = (0-self.omega[0])
+        debug_val3 = u_roll
+        #
+        debug1_out = Float64()
+        debug1_out.data = debug_val1
+        self.debug_val1_pub.publish(debug1_out)
+        debug2_out = Float64()
+        debug2_out.data = debug_val2 
+        self.debug_val2_pub.publish(debug2_out)
+        debug3_out = Float64()
+        debug3_out.data = debug_val3
+        self.debug_val3_pub.publish(debug3_out)
+
+        #u_yaw = self.d_yaw * (self.yaw_cmd-self.omega[2])
+        u_yaw = self.yaw_scaling * self.yaw_cmd
+
+
+        u = [u_thrust, u_roll, u_pitch, u_yaw]
+
+        return u
+
+
+
+
+
+
+    def run(self):
+        
+        rate = rospy.Rate(50.0)
+        while not rospy.is_shutdown():
+            #print("run "+str(self.thrust_cmd))
+            
+            u_ctrl = self.joystick_controller()
+
+            # publish control commands for feedthrough
+            msg_thrust_out = Float64()
+            msg_thrust_out.data = u_ctrl[0]
+            self.thrust_pub.publish(msg_thrust_out)
+
+            msg_roll_out = Float64()
+            msg_roll_out.data = u_ctrl[1]
+            self.roll_rate_pub.publish(msg_roll_out)
+
+            msg_pitch_out = Float64()
+            msg_pitch_out.data = u_ctrl[2]
+            self.pitch_rate_pub.publish(msg_pitch_out)
+
+            msg_yaw_out = Float64()
+            msg_yaw_out.data = u_ctrl[3]
+            self.yaw_rate_pub.publish(msg_yaw_out)
+            """
+            msg_actuator_out_0 = ActuatorControls()
+            msg_actuator_out_0.header.stamp = rospy.Time.now()
+            out = [0.0]*8
+            out[0] = u_ctrl[0]
+            out[1] = u_ctrl[1]
+            out[2] = u_ctrl[2]
+            out[3] = u_ctrl[3]
+
+            msg_actuator_out_0.control = out         
+            self.actuator_controls_pub.publish(msg_actuator_out_0)
+            """
+            rate.sleep()
+
+def main():
+    node = JoystickControlNode("joystick_control")
+    node.run()
+
+
+if __name__ == "__main__":
+    main()

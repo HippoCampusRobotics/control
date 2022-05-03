@@ -1,0 +1,5 @@
+<launch>
+    <node name="depth_estimator" pkg="control" type="depth_estimator_node" output="screen">
+        <rosparam command="load" file="$(find control)/config/depth_ekf_params.yaml" />
+    </node>
+</launch>
