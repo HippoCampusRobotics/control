@@ -16,6 +16,7 @@ from std_msgs.msg import Float64
 from sensor_msgs.msg import Imu
 
 
+
 import tf.transformations
 
 #from control.cfg import CarrotControlConfig
@@ -103,6 +104,7 @@ class JoystickControlNode(Node):
                                                Float64,
                                                self.on_but_y_joy,
                                                queue_size=1)
+
         #self.velocity_sub = rospy.Subscriber("mavros/local_position/velocity_body", 
         #                                        TwistStamped,
         #                                        self.on_velocity_body)
@@ -111,7 +113,6 @@ class JoystickControlNode(Node):
 
         self.attitude_sub = rospy.Subscriber("mavros/imu/data",
                                              Imu, self.on_pose)
-
 
         self.depth_sub = rospy.Subscriber("depth",
                                         DepthEKFStamped, 
@@ -155,7 +156,9 @@ class JoystickControlNode(Node):
             self.thrust_cmd = msg.data
 
     def on_pose(self, msg):
+
         q = msg.orientation
+
         pose = tf.transformations.euler_from_quaternion([q.x, q.y, q.z, q.w])
         self.pitch = pose[1]
         self.roll = pose[0]
@@ -241,9 +244,6 @@ class JoystickControlNode(Node):
         u = [u_thrust, u_roll, u_pitch, u_yaw]
 
         return u
-
-
-
 
 
 

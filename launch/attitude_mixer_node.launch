@@ -1,6 +1,6 @@
 <launch>
     <arg name="use_external_controller" />
-    <node name="attitude_mixer" pkg="control" type="attitude_mixer_node">
+    <node name="attitude_mixer" pkg="control" type="attitude_mixer_node" output="screen">
         <param name="use_external_controller" value="$(arg use_external_controller)" />
     </node>
 </launch>

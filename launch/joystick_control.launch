@@ -12,12 +12,12 @@
 
     <!--<include file="$(find control)/launch/depth_control_node.launch" pass_all_args="true" />-->
 
-
     <node name="joystick_control" pkg="control" type="joystick_control_node" output="screen"/>
     <node name="joystick_arm_manager" pkg="control" type="joystick_arm_manager_node" output="screen">
         <param name="vehicle_name" value="$(arg vehicle_name)" />
     </node> 
     <node name="joystick_mapper" pkg="control" type="joystick_mapper_node" output="screen"/>
+
     <node name="joy" pkg="joy" type="joy_node" />
 
     <group if="$(arg use_external_controller)">
