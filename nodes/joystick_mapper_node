@@ -3,6 +3,9 @@ import rospy
 from sensor_msgs.msg import Joy
 from std_msgs.msg import Float64
 from hippocampus_common.node import Node
+from hippocampus_msgs.msg import JoystickControlCommand
+
+
 
 
 class JoyMapperNode(Node):
@@ -18,10 +21,13 @@ class JoyMapperNode(Node):
         # self.lateral_thrust_pub = rospy.Publisher("lateral_thrust",
         #                                          Float64,
         #                                          queue_size=1)
-        self.thrust_pub = rospy.Publisher("thrust_joy", Float64, queue_size=1)
-        self.roll_pub = rospy.Publisher("roll_joy", Float64, queue_size=1)
-        self.pitch_pub = rospy.Publisher("pitch_joy", Float64, queue_size=1)
-        self.yaw_pub = rospy.Publisher("yaw_joy", Float64, queue_size=1)
+        
+        # self.thrust_pub = rospy.Publisher("thrust_joy", Float64, queue_size=1)
+        # self.roll_pub = rospy.Publisher("roll_joy", Float64, queue_size=1)
+        # self.pitch_pub = rospy.Publisher("pitch_joy", Float64, queue_size=1)
+        # self.yaw_pub = rospy.Publisher("yaw_joy", Float64, queue_size=1)
+
+        self.joy_cmds_mapped_pub = rospy.Publisher("joy_cmds", JoystickControlCommand, queue_size=1)
 
         self.but_a_pub = rospy.Publisher("but_a_joy", Float64, queue_size=1)
         self.but_b_pub = rospy.Publisher("but_b_joy", Float64, queue_size=1)
@@ -80,12 +86,19 @@ class JoyMapperNode(Node):
         return axis_mapping, button_mapping
 
     def on_joy(self, msg):
-        for axis in self.axis_map:
-            msg_out = Float64()
-            pub = self.get_axis_pub(axis)
-            index = self.axis_map[axis]
-            msg_out.data = msg.axes[index]
-            pub.publish(msg_out)
+        # for axis in self.axis_map:
+        #     msg_out = Float64()
+        #     pub = self.get_axis_pub(axis)
+        #     index = self.axis_map[axis]
+        #     msg_out.data = msg.axes[index]
+        #     pub.publish(msg_out)
+        
+        msg_joy_out = JoystickControlCommand()
+        msg_joy_out.thrust_x = msg.axes[self.axis_map["thrust"]]
+        msg_joy_out.roll = msg.axes[self.axis_map["roll"]]
+        msg_joy_out.pitch = msg.axes[self.axis_map["pitch"]]
+        msg_joy_out.yaw = msg.axes[self.axis_map["yaw"]]
+        self.joy_cmds_mapped_pub.publish(msg_joy_out)
         
         for button in self.button_map:
             msg_out = Float64()
