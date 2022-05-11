@@ -7,7 +7,7 @@ import rospy
 from dynamic_reconfigure.server import Server
 from control.cfg import PidJoystickControlConfig 
 
-from hippocampus_msgs.msg import ActuatorControls, DepthEKFStamped
+from hippocampus_msgs.msg import ActuatorControls, DepthEKFStamped, JoystickControlCommand
 from geometry_msgs.msg import PoseStamped, TwistStamped
 from hippocampus_common.node import Node
 from mavros_msgs.srv import CommandLong, CommandBool
@@ -75,26 +75,32 @@ class JoystickControlNode(Node):
                                                       ActuatorControls,
                                                       queue_size=1)
 
+        self.joy_cmd_sub = rospy.Subscriber("joy_cmds", 
+                                            JoystickControlCommand, 
+                                            self.on_joy_cmds, 
+                                            queue_size=1)
 
-        self.thrust_cmd_sub = rospy.Subscriber("thrust_joy", 
-                                               Float64,
-                                               self.on_thrust,
-                                               queue_size=1)
+        # self.thrust_cmd_sub = rospy.Subscriber("thrust_joy", 
+        #                                        Float64,
+        #                                        self.on_thrust,
+        #                                        queue_size=1)
+        # 
+        # self.yaw_cmd_sub = rospy.Subscriber("yaw_joy", 
+        #                                        Float64,
+        #                                        self.on_yaw,
+        #                                        queue_size=1)
+        # 
+        # self.pitch_cmd_sub = rospy.Subscriber("pitch_joy", 
+        #                                        Float64,
+        #                                        self.on_pitch,
+        #                                        queue_size=1)
+        # 
+        # self.roll_cmd_sub = rospy.Subscriber("roll_joy", 
+        #                                        Float64,
+        #                                        self.on_roll,
+        #                                        queue_size=1)
         
-        self.yaw_cmd_sub = rospy.Subscriber("yaw_joy", 
-                                               Float64,
-                                               self.on_yaw,
-                                               queue_size=1)
-
-        self.pitch_cmd_sub = rospy.Subscriber("pitch_joy", 
-                                               Float64,
-                                               self.on_pitch,
-                                               queue_size=1)
         
-        self.roll_cmd_sub = rospy.Subscriber("roll_joy", 
-                                               Float64,
-                                               self.on_roll,
-                                               queue_size=1)
         # dirty quick hack --> switch ros-services for buttons
         self.but_x_sub = rospy.Subscriber("but_x_joy", 
                                                Float64,
@@ -135,20 +141,30 @@ class JoystickControlNode(Node):
             self.thrust_scaling = config["thrust_scaling"]
         return config
 
-    def on_pitch(self, msg):
+    def on_joy_cmds(self, msg):
+        # note joystick publishes only when values change
+        
         with self.data_lock:
-            self.pitch_cmd = msg.data
+            self.thrust_cmd = msg.thrust_x
+            self.roll_cmd = msg.roll
+            self.pitch_cmd = msg.pitch
+            self.yaw_cmd = msg.yaw
+        
 
-    def on_roll(self, msg):
-        with self.data_lock:
-            self.roll_cmd = msg.data
-    def on_yaw(self, msg):
-        with self.data_lock:
-            self.yaw_cmd = msg.data
+    # def on_pitch(self, msg):
+    #     with self.data_lock:
+    #         self.pitch_cmd = msg.data
 
-    def on_thrust(self, msg):
-        with self.data_lock:
-            self.thrust_cmd = msg.data
+    # def on_roll(self, msg):
+    #     with self.data_lock:
+    #         self.roll_cmd = msg.data
+    # def on_yaw(self, msg):
+    #     with self.data_lock:
+    #         self.yaw_cmd = msg.data
+
+    # def on_thrust(self, msg):
+    #     with self.data_lock:
+    #         self.thrust_cmd = msg.data
 
     def on_imu_data(self, msg):
 
