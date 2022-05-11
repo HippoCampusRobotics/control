@@ -1,0 +1,12 @@
+<launch>
+    <!-- This launch file starts the fundamental nodes required to use the joystick-->
+    
+    <arg name="vehicle_name" />
+    
+    <node name="joy" pkg="joy" type="joy_node" />
+    <node name="joystick_mapper" pkg="control" type="joystick_mapper_node" output="screen"/>
+
+    <node name="joystick_arm_manager" pkg="control" type="joystick_arm_manager_node" output="screen">
+        <param name="vehicle_name" value="$(arg vehicle_name)" />
+    </node> 
+</launch>
