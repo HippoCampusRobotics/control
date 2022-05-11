@@ -1,0 +1,11 @@
+<launch>
+    <arg name="vehicle_name"/>
+    <arg name="use_ground_truth"/>
+    <arg name="use_external_controller"/>
+
+    <include file="$(find control)/launch/attitude_mixer_node.launch" pass_all_args="true" />
+
+    <node name="joystick_control" pkg="control" type="joystick_control_node" output="screen"/>
+    <include file= "$(find control)/launch/inc_joystick_base.launch" pass_all_args="true"/>    
+
+</launch>
