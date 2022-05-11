@@ -105,14 +105,9 @@ class JoystickControlNode(Node):
                                                self.on_but_y_joy,
                                                queue_size=1)
 
-        #self.velocity_sub = rospy.Subscriber("mavros/local_position/velocity_body", 
-        #                                        TwistStamped,
-        #                                        self.on_velocity_body)
-        #self.attitude_sub = rospy.Subscriber("mavros/local_position/pose",
-        #                                     PoseStamped, self.on_pose)
-
-        self.attitude_sub = rospy.Subscriber("mavros/imu/data",
-                                             Imu, self.on_pose)
+        self.imu_sub = rospy.Subscriber("mavros/imu/data",
+                                             Imu, self.on_imu_data)
+        
 
         self.depth_sub = rospy.Subscriber("depth",
                                         DepthEKFStamped, 
@@ -155,7 +150,7 @@ class JoystickControlNode(Node):
         with self.data_lock:
             self.thrust_cmd = msg.data
 
-    def on_pose(self, msg):
+    def on_imu_data(self, msg):
 
         q = msg.orientation
 
@@ -164,24 +159,15 @@ class JoystickControlNode(Node):
         self.roll = pose[0]
         self.yaw = pose[2]
 
-        # e = self.setpoint - pitch
-        # with self.data_lock:
-        #     u = self.update_controller(
-        #         error=e, now=rospy.get_time())
-
-        # msg = Float64(u)
-        # self.pitch_pub.publish(msg)
+        omega = msg.angular_velocity
+        with self.data_lock:
+            self.omega[:] = [omega.x, omega.y, omega.z]
     
     def on_depth(self, msg):
         self.depth = msg.depth
         self.depth_vel = msg.z_vel
 
 
-    def on_velocity_body(self, msg: TwistStamped):
-        omega = msg.twist.angular
-        with self.data_lock:
-            self.omega[:] = [omega.x, omega.y, omega.z]
-    
     
     def on_but_x_joy(self, msg):
         button_x = msg.data
