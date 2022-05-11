@@ -19,7 +19,7 @@ from sensor_msgs.msg import Imu
 
 import tf.transformations
 
-#from control.cfg import CarrotControlConfig
+# DON'T FORGET: set QGC params -> UUV_SKIP_CTRL and  UUV_INPUT_MODE
 
 class JoystickControlNode(Node):
     def __init__(self, name):
