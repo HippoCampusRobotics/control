@@ -1,0 +1,15 @@
+<launch>
+    <arg name="vehicle_name" />
+    <arg name="vehicle_type" default="hippocampus"/>
+
+    <arg name="use_ground_truth" value="false" /> 
+    <arg name="use_external_controller" value="false"/>
+    
+    <group ns="$(arg vehicle_name)">
+        <param name="vehicle_type" value="$(arg vehicle_type)" />
+
+        <include file="$(find control)/launch/path_tracking.launch" pass_all_args="true" />
+        <include file="$(find control)/launch/depth_estimator.launch" pass_all_args="true" />
+    </group>
+
+</launch>
