@@ -3,6 +3,7 @@
     <arg name="vehicle_name" />
     <arg name="use_ground_truth" value="false"/>
     <arg name="use_external_controller" value="false" />
+    <arg name="atmospheric_pressure" default="101300"/>
     
     <group ns="$(arg vehicle_name)">
         <include file="$(find control)/launch/inc_joystick_control.launch" pass_all_args="true"/>

@@ -7,7 +7,8 @@ from hippocampus_msgs.msg import DepthEKFStamped
 
 
 class KalmanFilter(object):
-    def __init__(self, x0, p0, v, w):
+
+    def __init__(self, x0, p0, v, w, atmospheric_pressure=101300):
         self.dim_state = 2
         self._x_est_0 = x0
         self._x_est = self._x_est_0
@@ -16,9 +17,10 @@ class KalmanFilter(object):
         self._v_mat = v
         self._w_mat = w
         self._h_mat = np.array([-1.0e4, 0.0]).reshape((1, -1))
+        self._atmos_press = atmospheric_pressure
 
     def h_fun(self, depth):
-        return -depth * 1.0e4 + 101300
+        return -depth * 1.0e4 + self._atmos_press
 
     def get_x_est(self):
         return np.copy(self._x_est)
@@ -71,6 +73,7 @@ class KalmanFilter(object):
 
 
 class DepthEstimatorNode(object):
+
     def __init__(self, node_name):
 
         rospy.init_node(node_name)
@@ -88,7 +91,9 @@ class DepthEstimatorNode(object):
         # initialize KF
         self.kf = KalmanFilter(x_0, p_mat_0, v, w)
         self.t_last_prediction = rospy.get_time()
-        self.depth_pub = rospy.Publisher("depth", DepthEKFStamped, queue_size=1)
+        self.depth_pub = rospy.Publisher("depth",
+                                         DepthEKFStamped,
+                                         queue_size=1)
 
         rospy.Subscriber("pressure",
                          FluidPressure,
