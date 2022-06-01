@@ -20,6 +20,7 @@ generate_dynamic_reconfigure_options(
   cfg/CarrotControl.cfg
   cfg/Twister.cfg
   cfg/PidJoystickControl.cfg
+  cfg/JoystickDepthStabilizer.cfg
 )
 
 catkin_package()
@@ -41,9 +42,11 @@ catkin_install_python(PROGRAMS
   nodes/geom_att_ctrl_node
   nodes/actuator_mixer_node
   nodes/twister_node
+  nodes/joystick_bluerov_node
+  nodes/joystick_hippo_node
+  nodes/joystick_bluerov_depth_stabilizer_node
   nodes/joystick_arm_manager_node
   nodes/joystick_mapper_node
-  nodes/joystick_control_node
   nodes/depth_estimator_node
   DESTINATION ${CATKIN_PACKAGE_BIN_DESTINATION}
 )

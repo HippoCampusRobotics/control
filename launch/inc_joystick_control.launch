@@ -1,11 +1,21 @@
 <launch>
     <arg name="vehicle_name"/>
-    <arg name="use_ground_truth"/>
-    <arg name="use_external_controller"/>
+    <arg name="vehicle_type"/>
 
-    <include file="$(find control)/launch/attitude_mixer_node.launch" pass_all_args="true" />
+    <arg name="use_depth_stabilizer" default="false" />
 
-    <node name="joystick_control" pkg="control" type="joystick_control_node" output="screen"/>
-    <include file= "$(find control)/launch/inc_joystick_base.launch" pass_all_args="true"/>    
+    <node name="joy" pkg="joy" type="joy_node" />
 
+    <group if="$(eval arg('vehicle_type')=='bluerov')">
+        <node name="joystick_control" pkg="control" type="joystick_bluerov_node" output="screen" />
+        <node if="$(arg use_depth_stabilizer)" name="depth_stabilizer" pkg="control" type="joystick_bluerov_depth_stabilizer_node" output="screen" />
+    </group>
+
+    <group if="$(eval arg('vehicle_type')=='hippocampus')">
+        <node name="joystick_mapper" pkg="control" type="joystick_mapper_node" output="screen"/>
+        <node name="joystick_arm_manager" pkg="control" type="joystick_arm_manager_node" output="screen">
+            <param name="vehicle_name" value="$(arg vehicle_name)" />
+        </node> 
+        <node name="joystick_control" pkg="control" type="joystick_hippo_node" output="screen"/>
+    </group>
 </launch>

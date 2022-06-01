@@ -1,0 +1,120 @@
+#!/usr/bin/env python
+from hippocampus_common.node import Node
+import rospy
+from std_msgs.msg import Float64
+import threading
+from mavros_msgs.msg import State
+from depth_control.msg import DepthEKFStamped
+from dynamic_reconfigure.server import Server
+from control.cfg import JoystickDepthStabilizerConfig
+
+
+class StabilizerNode(Node):
+    """
+    Depth Stabilizer during joystick control for BlueROV.
+    """
+    def __init__(self, name, anonymous=False, disable_signals=False):
+        super(StabilizerNode, self).__init__(name,
+                                             anonymous=anonymous,
+                                             disable_signals=disable_signals)
+
+        self.data_lock = threading.RLock()
+
+        self.throttle = 0.0
+        self.armed = False
+        self.hold_depth = True
+        self.input_threshold = 0.1
+
+        self.hz = 30.0
+
+        self.current_depth = 0.0
+        self.current_speed = 0.0
+        self.depth_setpoint = 0.0
+        self.speed_setpoint = 0.0
+        self.depth_gain = 1.0
+        self.speed_gain = 1.0
+
+        self.MAX_SPEED = 0.2
+
+        self.reconfigure_server = Server(JoystickDepthStabilizerConfig,
+                                         self.on_reconfigure)
+
+        self.vertical_thrust_pub = rospy.Publisher("vertical_thrust",
+                                                   Float64,
+                                                   queue_size=1)
+
+        self.depth_setpoint_pub = rospy.Publisher("~debug_depth_setpoint",
+                                                  Float64,
+                                                  queue_size=1)
+
+        self.input_sub = rospy.Subscriber("vertical_thrust_input",
+                                          Float64,
+                                          self.on_input,
+                                          queue_size=1)
+        self.state_sub = rospy.Subscriber("mavros/state", State, self.on_state)
+        self.depth_sub = rospy.Subscriber("depth", DepthEKFStamped,
+                                          self.on_depth)
+
+    def on_reconfigure(self, config, _):
+        with self.data_lock:
+            self.MAX_SPEED = config["max_speed"]
+            self.depth_gain = config["depth_gain"]
+            self.speed_gain = config["speed_gain"]
+        return config
+
+    def on_input(self, msg):
+        with self.data_lock:
+            self.throttle = msg.data
+            if abs(self.throttle) > self.input_threshold:
+                self.hold_depth = False
+            else:
+                if not self.hold_depth:
+                    self.depth_setpoint = self.current_depth
+                self.hold_depth = True
+
+    def on_depth(self, msg):
+        with self.data_lock:
+            self.current_depth = msg.depth
+            self.current_speed = msg.z_vel
+
+    def on_state(self, msg):
+        with self.data_lock:
+            self.armed = msg.armed
+
+    def run(self):
+        r = rospy.Rate(self.hz)
+
+        while not rospy.is_shutdown():
+            with self.data_lock:
+                if self.hold_depth:
+                    self.do_depth_control()
+                else:
+                    self.do_speed_control()
+
+                msg = Float64()
+                msg.data = self.depth_setpoint
+                self.depth_setpoint_pub.publish(msg)
+            r.sleep()
+
+    def do_depth_control(self):
+        error = self.depth_setpoint - self.current_depth
+        u = self.depth_gain * error
+        msg = Float64()
+        msg.data = u
+        self.vertical_thrust_pub.publish(msg)
+
+    def do_speed_control(self):
+        error = self.throttle * self.MAX_SPEED - self.current_speed
+        u = self.speed_gain * error
+        msg = Float64()
+        msg.data = u
+        self.vertical_thrust_pub.publish(msg)
+
+
+def main():
+    node = StabilizerNode("depth_stabilizer")
+    node.run()
+
+
+if __name__ == "__main__":
+    main()

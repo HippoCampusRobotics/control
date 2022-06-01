@@ -11,6 +11,10 @@ except ImportError:
 
 
 class SimpleMixer(object):
+    """
+    Recreation of PX4's SimpleMixer.
+    """
+
     def __init__(self, mixer_data=None):
         self.n_actuators = len(mixer_data)
         self.mapping = mixer_data
@@ -29,6 +33,11 @@ class SimpleMixer(object):
 
 
 class MixerNode(Node):
+    """
+    Mixer to map control outputs (e.g. roll, pitch, yaw, thrust, 
+    vertical_thrust, lateral_thrust) to motor signals (actuator_controls).
+    """
+
     def __init__(self, name, anonymous=False, disable_signals=False):
         super().__init__(name,
                          anonymous=anonymous,
@@ -50,9 +59,8 @@ class MixerNode(Node):
         self.mixer_data = None
         self.mixer = None
         self.update_mixer_from_server()
-        self.actuator_controls_sub = rospy.Subscriber("actuator_controls_0",
-                                                      ActuatorControls,
-                                                      self.on_actuator_controls)
+        self.actuator_controls_sub = rospy.Subscriber(
+            "actuator_controls_0", ActuatorControls, self.on_actuator_controls)
 
     def on_actuator_controls(self, msg: ActuatorControls):
         if self.mixer is None:

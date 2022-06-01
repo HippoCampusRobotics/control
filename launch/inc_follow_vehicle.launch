@@ -3,6 +3,6 @@
     <arg name="path_file" default="$(find path_planning)/config/infinity_path.yaml" />
     <arg name="use_external_controller" />
     <arg if="$(arg use_external_controller)" name="mixer_file" />
-    <include file="$(find control)/launch/path_tracking.launch" pass_all_args="true" />
-    <include file="$(find control)/launch/distance_control_node.launch" pass_all_args="true" />
+    <include file="$(find control)/launch/inc_path_tracking.launch" pass_all_args="true" />
+    <include file="$(find control)/launch/node_distance_control.launch" pass_all_args="true" />
 </launch>

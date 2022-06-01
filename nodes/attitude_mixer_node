@@ -10,6 +10,11 @@ from std_msgs.msg import Float64
 
 
 class AttitudeMixerNode(Node):
+    """
+    Mixer to combine control outputs (roll, pitch, yaw angles and rates and 
+    thrust (according to message definition in PX4)) in a single message
+    (mavros/setpoint_raw/attitude).
+    """
     def __init__(self, name):
         super(AttitudeMixerNode, self).__init__(name=name)
         self.data_lock = threading.RLock()
