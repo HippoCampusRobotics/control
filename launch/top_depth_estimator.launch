@@ -1,0 +1,10 @@
+<launch>
+
+    <arg name="vehicle_name" />
+    <arg name="atmospheric_pressure" default="101300"/>
+    
+    <group ns="$(arg vehicle_name)">
+        <include file="$(find control)/launch/depth_estimator.launch" pass_all_args="true"/>
+    </group>
+
+</launch>

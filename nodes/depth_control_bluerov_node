@@ -1,0 +1,74 @@
+#!/usr/bin/env python
+import rospy
+from control.pid import PidNode
+from hippocampus_msgs.msg import DepthEKFStamped
+from std_msgs.msg import Float64
+from nav_msgs.msg import Odometry
+
+
+class DepthControlNode(PidNode):
+
+    def __init__(self):
+        super(DepthControlNode, self).__init__("depth_controller")
+
+        self.setpoint = -0.5
+        self.depth_velocity_setpoint = 0.0
+
+        self.use_ground_truth = self.get_param("~use_ground_truth",
+                                               default=False)
+
+        self.t_last = rospy.Time.now()
+
+        self.thrust_pub = rospy.Publisher("vertical_thrust",
+                                          Float64,
+                                          queue_size=1)
+
+        if self.use_ground_truth:
+            self.ground_truth_sub = rospy.Subscriber("ground_truth/state",
+                                                     Odometry,
+                                                     self.on_depth,
+                                                     queue_size=1)
+        self.depth_sub = rospy.Subscriber("depth",
+                                          DepthEKFStamped,
+                                          self.on_depth,
+                                          queue_size=1)
+
+    def on_depth(self, msg):
+        now = rospy.Time.now()
+
+        if self.use_ground_truth:
+            depth = msg.pose.pose.position.z
+            with self.data_lock:
+                dt = now - self.t_last
+                self.t_last = now
+                u = self.compute_control_output(depth=depth, dt=dt.to_sec())
+        else:
+            depth = msg.depth
+            velocity = msg.z_vel
+            with self.data_lock:
+                dt = now - self.t_last
+                self.t_last = now
+                u = self.compute_control_output(depth=depth,
+                                                dt=dt.to_sec(),
+                                                depth_velocity=velocity)
+
+        msg = Float64(u)
+        self.thrust_pub.publish(msg)
+
+    def compute_control_output(self, depth, dt, depth_velocity=None):
+        error = self.setpoint - depth
+        if depth_velocity is not None:
+            derror = self.depth_velocity_setpoint - depth_velocity
+        else:
+            derror = None
+        u = self.controller.update(error=error, dt=dt, derror=derror)
+        return u
+
+
+def main():
+    node = DepthControlNode()
+    node.run()
+
+
+if __name__ == "__main__":
+    main()

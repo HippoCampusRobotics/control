@@ -1,0 +1,7 @@
+p_gain: 0.5
+i_gain: 0.0
+d_gain: 0.2
+saturation_upper: 1.0
+saturation_lower: -1.0
+integral_lower: -0.1
+integral_upper: 0.1

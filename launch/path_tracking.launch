@@ -8,7 +8,7 @@
 
     <include file="$(find control)/launch/attitude_mixer_node.launch" pass_all_args="true" />
 
-    <include file="$(find control)/launch/depth_control_node.launch" pass_all_args="true" />
+    <include file="$(find control)/launch/node_depth_control_hippo.launch" pass_all_args="true" />
 
     <include file="$(find control)/launch/path_follower_node.launch" pass_all_args="true" />
 

@@ -34,7 +34,8 @@ include_directories(
 ## in contrast to setup.py, you can choose the destination
 catkin_install_python(PROGRAMS
   nodes/attitude_mixer_node
-  nodes/depth_control_node
+  nodes/depth_control_hippo_node
+  nodes/depth_control_bluerov_node
   nodes/path_follower_node
   nodes/distance_control_node
   nodes/geom_att_ctrl_node
