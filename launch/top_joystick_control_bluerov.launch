@@ -1,6 +1,6 @@
 <launch>
     <arg name="vehicle_name" />
-    <arg name="vehicle_type" default="hippocampus" />
+    <arg name="vehicle_type" default="bluerov" />
 
     <arg name="use_ground_truth" default="false"/>
     <arg name="use_external_controller" default="false" />
