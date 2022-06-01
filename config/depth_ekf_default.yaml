@@ -1,0 +1,4 @@
+# variance
+depth_var: 0.00001
+velocity_depth_var: 0.001
+pressure_var: 10000       # Unit of standard deviation: Pascal

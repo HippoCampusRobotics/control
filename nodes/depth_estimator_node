@@ -77,16 +77,16 @@ class DepthEstimatorNode(object):
     def __init__(self, node_name):
 
         rospy.init_node(node_name)
-        sig_depth = float(rospy.get_param('~sig_depth'))
-        sig_vel_depth = float(rospy.get_param('~sig_vel_depth'))
-        sig_pressure = float(rospy.get_param('~sig_pressure'))
+        depth_var = float(rospy.get_param('~depth_var'))
+        velocity_depth_var = float(rospy.get_param('~velocity_depth_var'))
+        pressure_var = float(rospy.get_param('~pressure_var'))
 
         x_0 = np.array([0.0, 0.0]).reshape((-1, 1))
         p_mat_0 = np.array(np.diag([0.1, 0.1]))
         # process noise variance
-        v = np.array(np.diag([sig_depth**2, sig_vel_depth**2]))
+        v = np.array(np.diag([depth_var, velocity_depth_var]))
         # measurement noise variance
-        w = np.array([sig_pressure**2]).reshape((-1, 1))
+        w = np.array([pressure_var]).reshape((-1, 1))
 
         # initialize KF
         self.kf = KalmanFilter(x_0, p_mat_0, v, w)
