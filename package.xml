@@ -22,16 +22,13 @@
   <build_depend>hippocampus_common</build_depend>
   <build_depend>hippocampus_msgs</build_depend>
   <build_depend>mavros_msgs</build_depend>
-  <build_depend>depth_control</build_depend>
 
   <build_export_depend>hippocampus_common</build_export_depend>
   <build_export_depend>hippocampus_msgs</build_export_depend>
-  <build_export_depend>depth_control</build_export_depend>
   
   <exec_depend>hippocampus_common</exec_depend>
   <exec_depend>hippocampus_msgs</exec_depend>
   <exec_depend>mavros_msgs</exec_depend>
-  <exec_depend>depth_control</exec_depend>
 
   <depend>path_planning</depend>
 
