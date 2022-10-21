@@ -7,7 +7,9 @@
     <node name="joy" pkg="joy" type="joy_node" />
 
     <group if="$(eval arg('vehicle_type')=='bluerov')">
-        <node name="joystick_control" pkg="control" type="joystick_bluerov_node" output="screen" />
+        <node name="joystick_control" pkg="control" type="joystick_bluerov_node" output="screen">
+            <param name="use_depth_stabilizer" value="$(arg use_depth_stabilizer)" />
+        </node>
         <node if="$(arg use_depth_stabilizer)" name="depth_stabilizer" pkg="control" type="joystick_bluerov_depth_stabilizer_node" output="screen" />
     </group>
 

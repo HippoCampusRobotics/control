@@ -6,13 +6,16 @@ from hippocampus_common.node import Node
 
 
 class JoyMapperNode(Node):
+
     def __init__(self, name):
         super(JoyMapperNode, self).__init__(name)
 
-        rospy.logwarn("hello")
         self.mapping = self.read_params()
-
-        self.vertical_thrust_pub = rospy.Publisher("vertical_thrust_input",
+        if self.get_param("~use_depth_stabilizer"):
+            topic = "vertical_thrust_input"
+        else:
+            topic = "vertical_thrust"
+        self.vertical_thrust_pub = rospy.Publisher(topic,
                                                    Float64,
                                                    queue_size=1)
         self.lateral_thrust_pub = rospy.Publisher("lateral_thrust",
