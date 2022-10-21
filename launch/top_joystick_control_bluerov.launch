@@ -9,7 +9,6 @@
     <group ns="$(arg vehicle_name)">
         <include file="$(find control)/launch/inc_joystick_control.launch" pass_all_args="true"/>
 
-        <include file="$(find control)/launch/node_attitude_mixer.launch" pass_all_args="true" />
         <include file="$(find control)/launch/node_depth_estimator.launch" pass_all_args="true"/>
     </group>
 </launch>

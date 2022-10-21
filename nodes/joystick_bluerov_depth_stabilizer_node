@@ -4,7 +4,7 @@ import rospy
 from std_msgs.msg import Float64
 import threading
 from mavros_msgs.msg import State
-from depth_control.msg import DepthEKFStamped
+from hippocampus_msgs.msg import DepthEKFStamped
 from dynamic_reconfigure.server import Server
 from control.cfg import JoystickDepthStabilizerConfig
 
