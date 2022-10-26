@@ -6,7 +6,7 @@
     <arg if="$(arg use_external_controller)" name="mixer_file" />
     <arg name="path_file" default="$(find path_planning)/config/big_infinity.yaml" />
 
-    <include file="$(find control)/launch/attitude_mixer_node.launch" pass_all_args="true" />
+    <include file="$(find control)/launch/node_attitude_mixer.launch" pass_all_args="true" />
 
     <include file="$(find control)/launch/node_depth_control_hippo.launch" pass_all_args="true" />
 
